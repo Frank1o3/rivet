@@ -6,6 +6,7 @@ pub mod error;
 pub mod feature;
 pub mod package_name;
 pub mod paths;
+pub mod scope;
 pub mod target;
 pub mod version;
 
@@ -18,3 +19,4 @@ pub use package_name::PackageName;
 pub use paths::{absolute_path, default_path, default_prefix, default_source_cache};
 pub use target::{Target, TargetArch, TargetOs};
 pub use version::{Version, VersionReq};
+pub use scope::InstallScope;

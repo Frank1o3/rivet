@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use rivet_core::{FeatureSet, PackageName, Target, VersionReq};
 use rivet_package::{Dependency, DependencyKind, PackageManifest};
@@ -31,6 +31,10 @@ impl<'a, P: PackageProvider> DependencySolver<'a, P> {
 
         // 2. Map of package name -> (PackageManifest, FeatureSet)
         let mut selected: HashMap<PackageName, (PackageManifest, FeatureSet)> = HashMap::new();
+
+        // Names of packages whose requirement was satisfied by a
+        // system-detected capability rather than by Rivet itself.
+        let mut system_provided: HashSet<PackageName> = HashSet::new();
 
         // 3. Work queue of dependencies to resolve: (Dependency, requested_by)
         let mut queue: VecDeque<(Dependency, Option<PackageName>)> = VecDeque::new();
@@ -137,6 +141,17 @@ impl<'a, P: PackageProvider> DependencySolver<'a, P> {
                 }
             };
 
+            let is_system_provided = chosen
+                .provider_check
+                .as_ref()
+                .and_then(|check| check.detect())
+                .map(|detected| current_reqs.iter().all(|(req, _)| req.matches(&detected)))
+                .unwrap_or(false);
+
+            if is_system_provided {
+                system_provided.insert(pkg_name.clone());
+            }
+
             // Initialize enabled features (defaults + requested)
             let mut enabled_features = FeatureSet::new();
             for default_feat in &chosen.default_features {
@@ -147,15 +162,18 @@ impl<'a, P: PackageProvider> DependencySolver<'a, P> {
             }
 
             // Queue all dependencies of the chosen package
-            for sub_dep in &chosen.dependencies {
-                queue.push_back((sub_dep.clone(), Some(pkg_name.clone())));
-            }
+            if !is_system_provided {
+                // Queue all dependencies of the chosen package
+                for sub_dep in &chosen.dependencies {
+                    queue.push_back((sub_dep.clone(), Some(pkg_name.clone())));
+                }
 
-            // Queue feature-specific dependencies for all enabled features
-            for feat in enabled_features.iter() {
-                if let Some(feat_deps) = chosen.features.get(feat) {
-                    for f_dep in feat_deps {
-                        queue.push_back((f_dep.clone(), Some(pkg_name.clone())));
+                // Queue feature-specific dependencies for all enabled features
+                for feat in enabled_features.iter() {
+                    if let Some(feat_deps) = chosen.features.get(feat) {
+                        for f_dep in feat_deps {
+                            queue.push_back((f_dep.clone(), Some(pkg_name.clone())));
+                        }
                     }
                 }
             }
@@ -164,13 +182,14 @@ impl<'a, P: PackageProvider> DependencySolver<'a, P> {
         }
 
         // 4. Topological Sort with Cycle Detection
-        self.topological_sort(selected)
+        self.topological_sort(selected, &system_provided)
     }
 
     /// Performs topological sorting on the resolved packages.
     fn topological_sort(
         &self,
         selected: HashMap<PackageName, (PackageManifest, FeatureSet)>,
+        system_provided: &HashSet<PackageName>,
     ) -> Result<ResolutionPlan> {
         let mut adj_list: HashMap<PackageName, Vec<PackageName>> = HashMap::new();
         let mut in_degree: HashMap<PackageName, usize> = HashMap::new();
@@ -260,6 +279,7 @@ impl<'a, P: PackageProvider> DependencySolver<'a, P> {
                 enabled_features,
                 build_dependencies: build_deps,
                 runtime_dependencies: runtime_deps,
+                is_system_provided: system_provided.contains(&name),
             });
         }
 

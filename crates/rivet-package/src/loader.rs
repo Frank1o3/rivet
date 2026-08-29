@@ -206,6 +206,24 @@ fn parse_package_table(table: &Table) -> std::result::Result<PackageManifest, St
         }
     }
 
+    // Provider check — lets this package say "skip building me if a
+    // compatible version is already on the system."
+    let provider_check = if let Ok(pc_table) = table.get::<Table>("provides_check") {
+        let command: String = pc_table
+            .get("command")
+            .map_err(|_| "provides_check missing 'command'".to_string())?;
+        let version_flag: String = pc_table
+            .get("version_flag")
+            .unwrap_or_else(|_| "--version".to_string());
+
+        Some(crate::provider::ProviderCheck {
+            command,
+            version_flag,
+        })
+    } else {
+        None
+    };
+
     Ok(PackageManifest {
         name,
         version,
@@ -219,6 +237,7 @@ fn parse_package_table(table: &Table) -> std::result::Result<PackageManifest, St
         supported_architectures,
         supported_os,
         recipe_path: PathBuf::new(),
+        provider_check,
     })
 }
 
@@ -426,7 +445,7 @@ mod tests {
             })
         "#;
 
-        let ctx = crate::context::BuildContext::new(&src, &bld, &dst);
+        let ctx = crate::context::BuildContext::new(&src, &bld, &dst, tmp.path());
         let loader = PackageLoader::new().unwrap();
         loader
             .run_hooks(

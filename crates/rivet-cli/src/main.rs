@@ -15,26 +15,26 @@ fn main() -> anyhow::Result<()> {
             feature,
         } => {
             let repos = repo_helper::load_repositories(cli.repo.as_deref())?;
+
+            let scope = if cli.system {
+                rivet_core::InstallScope::System
+            } else {
+                rivet_core::InstallScope::User
+            };
+            scope.check_permitted()?;
+
             let db_path = match cli.db {
                 Some(path) => rivet_core::absolute_path(path)?,
-                None => rivet_core::default_path()?,
+                None => scope.default_db_path()?,
             };
-
             let prefix = match cli.prefix {
                 Some(path) => rivet_core::absolute_path(path)?,
-                None => rivet_core::default_prefix()?,
+                None => scope.default_prefix()?,
             };
             let cache_dir = match cli.cache {
                 Some(path) => rivet_core::absolute_path(path)?,
                 None => rivet_core::default_source_cache()?,
             };
-
-            println!(
-                "DB Path: {}\nPrefix Path: {}\nCache Path: {}",
-                &db_path.display(),
-                &prefix.display(),
-                &cache_dir.display()
-            );
 
             let mut db = InstalledDatabase::open(db_path)?;
             commands::install::execute(
@@ -57,21 +57,33 @@ fn main() -> anyhow::Result<()> {
             commands::build::execute(&recipe, check_only)?;
         }
         args::Commands::Remove { package } => {
+            let scope = if cli.system {
+                rivet_core::InstallScope::System
+            } else {
+                rivet_core::InstallScope::User
+            };
+            scope.check_permitted()?;
+
             let db_path = match cli.db {
                 Some(path) => rivet_core::absolute_path(path)?,
-                None => rivet_core::default_path()?,
+                None => scope.default_db_path()?,
             };
             let mut db = InstalledDatabase::open(db_path)?;
             let prefix = match cli.prefix {
                 Some(path) => rivet_core::absolute_path(path)?,
-                None => rivet_core::default_prefix()?,
+                None => scope.default_prefix()?,
             };
             commands::remove::execute(&mut db, &package, &prefix)?;
         }
         args::Commands::List => {
+            let scope = if cli.system {
+                rivet_core::InstallScope::System
+            } else {
+                rivet_core::InstallScope::User
+            };
             let db_path = match cli.db {
                 Some(path) => rivet_core::absolute_path(path)?,
-                None => rivet_core::default_path()?,
+                None => scope.default_db_path()?,
             };
             let db = InstalledDatabase::open(db_path)?;
             commands::list::execute(&db)?;

@@ -5,6 +5,7 @@ use rivet_core::{Feature, PackageName, Target, TargetArch, TargetOs, Version};
 use serde::{Deserialize, Serialize};
 
 use crate::dependency::Dependency;
+use crate::provider::ProviderCheck;
 use crate::source::Source;
 
 /// The complete declarative metadata extracted from a package recipe.
@@ -29,6 +30,8 @@ pub struct PackageManifest {
     /// likely "path to the locally cached copy after fetch".
     #[serde(default)]
     pub recipe_path: PathBuf,
+    #[serde(default)]
+    pub provider_check: Option<ProviderCheck>,
 }
 
 impl PackageManifest {

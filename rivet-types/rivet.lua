@@ -22,6 +22,10 @@
 ---@class RivetSourceVirtual
 ---@field type "virtual"
 
+---@class RivetProviderCheck
+---@field command string
+---@field version_flag string?
+
 ---@alias RivetSource RivetSourceArchive|RivetSourceGit|RivetSourceLocal|RivetSourceVirtual
 
 ---Execution context passed to lifecycle hooks.
@@ -173,6 +177,7 @@ function BuildContext:chmod(path, mode) end
 ---@field install fun(ctx: RivetBuildContext)?
 ---@field post_install fun(ctx: RivetBuildContext)?
 ---@field uninstall fun(ctx: RivetBuildContext)?
+---@field provides_check RivetProviderCheck?
 
 ---Defines a Rivet package recipe. Call exactly once per file.
 ---@param def RivetPackageDef

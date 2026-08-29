@@ -22,6 +22,9 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub cache: Option<PathBuf>,
 
+    #[arg(long, global = true)]
+    pub system: bool,
+
     #[command(subcommand)]
     pub command: Commands,
 }

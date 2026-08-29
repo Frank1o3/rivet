@@ -44,7 +44,7 @@ pub fn install(
     let dest_dir = prefix.join(format!("{}-{}", manifest.name, manifest.version));
     fs::create_dir_all(&dest_dir).map_err(PackageError::Io)?;
 
-    let ctx = BuildContext::new(&source_dir, build_dir.path(), &dest_dir);
+    let ctx = BuildContext::new(&source_dir, build_dir.path(), &dest_dir, prefix);
 
     let loader = PackageLoader::new()?;
     loader.run_hooks(
@@ -78,7 +78,7 @@ pub fn uninstall(record: &InstalledRecord, prefix: &Path) -> Result<()> {
     };
 
     let dest_dir = prefix.join(format!("{}-{}", record.name, record.version));
-    let ctx = BuildContext::new(&dest_dir, &dest_dir, &dest_dir);
+    let ctx = BuildContext::new(&dest_dir, &dest_dir, &dest_dir, prefix);
 
     let loader = PackageLoader::new()?;
     loader.run_hooks(script, &ctx, &["uninstall"])

@@ -11,6 +11,7 @@ pub struct BuildContext {
     pub source_dir: PathBuf,
     pub build_dir: PathBuf,
     pub dest_dir: PathBuf,
+    pub prefix: PathBuf,
     pub env_vars: HashMap<String, String>,
 }
 
@@ -19,11 +20,13 @@ impl BuildContext {
         source_dir: impl AsRef<Path>,
         build_dir: impl AsRef<Path>,
         dest_dir: impl AsRef<Path>,
+        prefix: impl AsRef<Path>,
     ) -> Self {
         Self {
             source_dir: source_dir.as_ref().to_path_buf(),
             build_dir: build_dir.as_ref().to_path_buf(),
             dest_dir: dest_dir.as_ref().to_path_buf(),
+            prefix: prefix.as_ref().to_path_buf(),
             env_vars: HashMap::new(),
         }
     }
@@ -246,10 +249,8 @@ impl UserData for BuildContext {
             Ok(())
         });
 
-        methods.add_method("remove_dir_all", |_, _, path: String| {
-            fs::remove_dir_all(&path).map_err(|e| mlua::Error::runtime(e.to_string()))?;
-
-            Ok(())
+        methods.add_method("prefix", |_, this, ()| {
+            Ok(this.prefix.to_string_lossy().to_string())
         });
 
         methods.add_method("prefix", |_, _, ()| {

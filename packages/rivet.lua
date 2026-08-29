@@ -1,6 +1,6 @@
 package({
     name = "rivet",
-    version = "0.1.4",
+    version = "0.1.5",
 
     description = "A general-purpose, cross-platform package manager",
     license = "BSD-3-Clause",

@@ -5,6 +5,7 @@ pub mod fetch;
 pub mod installer;
 pub mod loader;
 pub mod manifest;
+pub mod provider;
 pub mod source;
 
 pub use context::BuildContext;
@@ -13,4 +14,5 @@ pub use error::{PackageError, Result};
 pub use installer::{install, uninstall};
 pub use loader::PackageLoader;
 pub use manifest::PackageManifest;
+pub use provider::ProviderCheck;
 pub use source::{GitRef, Source};

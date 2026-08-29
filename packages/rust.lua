@@ -6,6 +6,11 @@ package({
     license = "MIT OR Apache-2.0",
     homepage = "https://www.rust-lang.org/",
 
+    provides_check = {
+        command = "rustc",
+        version_flag = "--version"
+    },
+
     source = {
         type = "archive",
         url = "https://static.rust-lang.org/dist/2026-08-20/rust-1.98.0-x86_64-unknown-linux-gnu.tar.xz",

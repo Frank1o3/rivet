@@ -5,17 +5,15 @@ use serde::{Deserialize, Serialize};
 /// A single resolved package ready for build/installation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResolvedPackage {
-    /// Full package manifest.
     pub manifest: PackageManifest,
-
-    /// Set of enabled features.
     pub enabled_features: FeatureSet,
-
-    /// Names of build dependencies that must be available during compilation.
     pub build_dependencies: Vec<PackageName>,
-
-    /// Names of runtime dependencies that must be installed on the system.
     pub runtime_dependencies: Vec<PackageName>,
+    /// True if this package's requirement was satisfied by something
+    /// already present on the system rather than by Rivet building or
+    /// installing it. Installers should skip it entirely.
+    #[serde(default)]
+    pub is_system_provided: bool,
 }
 
 /// An ordered execution plan for building and installing resolved packages.

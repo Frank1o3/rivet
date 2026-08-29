@@ -97,6 +97,13 @@ pub fn execute(
             );
             continue;
         }
+        if item.is_system_provided {
+            println!(
+                "🖥️  '{}' is already provided by the system, skipping.",
+                item.manifest.name
+            );
+            continue;
+        }
 
         println!(
             "⬇️  Installing '{}' v{}...",
