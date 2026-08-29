@@ -1,0 +1,16 @@
+[package]
+    authors.workspace=true
+    edition.workspace=true
+    license.workspace=true
+    name="rivet-resolver"
+    repository.workspace=true
+    version.workspace=true
+
+[dependencies]
+    rivet-core.workspace=true
+    rivet-package.workspace=true
+    serde.workspace=true
+    thiserror.workspace=true
+
+[dev-dependencies]
+    serde_json.workspace=true

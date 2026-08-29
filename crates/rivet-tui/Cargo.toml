@@ -1,0 +1,18 @@
+[package]
+    authors.workspace=true
+    edition.workspace=true
+    license.workspace=true
+    name="rivet-tui"
+    repository.workspace=true
+    version.workspace=true
+
+[dependencies]
+    anyhow.workspace=true
+    rivet-core.workspace=true
+    rivet-package.workspace=true
+    rivet-repository.workspace=true
+    rivet-resolver.workspace=true
+
+    # TUI-specific libraries
+    crossterm="0.29.0"
+    ratatui="0.30.2"

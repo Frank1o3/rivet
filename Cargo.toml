@@ -1,0 +1,34 @@
+[workspace]
+    members=["crates/rivet-cli", "crates/rivet-core", "crates/rivet-package", "crates/rivet-repository", "crates/rivet-resolver", "crates/rivet-tui"]
+    resolver="3"
+
+    [workspace.package]
+        authors=["Frank1o3"]
+        edition="2024"
+        license="BSD-3-Clause"
+        repository="https://github.com/Frank1o3/rivet.git"
+        version="0.1.3"
+
+    [workspace.dependencies]
+        rivet-cli={path="crates/rivet-cli"}
+        rivet-core={path="crates/rivet-core"}
+        rivet-package={path="crates/rivet-package"}
+        rivet-repository={path="crates/rivet-repository"}
+        rivet-resolver={path="crates/rivet-resolver"}
+
+        # Error handling
+        anyhow="1.0"
+        thiserror="2.0"
+
+        # Serialization
+        serde={version="1.0", features=["derive"]}
+        serde_json="1.0"
+
+        # Versioning & Primitives
+        hex="0.4"
+        semver={version="1.0", features=["serde"]}
+        sha2="0.11.0"
+
+        # Filesystem & Utilities
+        tempfile="3.17"
+        walkdir="2.5"

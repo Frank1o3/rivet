@@ -1,0 +1,18 @@
+[package]
+    authors.workspace=true
+    edition.workspace=true
+    license.workspace=true
+    name="rivet-cli"
+    repository.workspace=true
+    version.workspace=true
+
+[dependencies]
+    anyhow.workspace=true
+    clap={version="4.5", features=["cargo", "derive"]}
+    rivet-core.workspace=true
+    rivet-package.workspace=true
+    rivet-repository.workspace=true
+    rivet-resolver.workspace=true
+    serde.workspace=true
+    serde_json.workspace=true
+    thiserror.workspace=true
