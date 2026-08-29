@@ -12,11 +12,11 @@ pub mod version;
 
 // Re-export common domain types for ergonomic usage
 pub use checksum::Checksum;
-pub use database::{InstalledDatabase, InstalledRecord};
+pub use database::{InstalledDatabase, InstalledRecord, RecordedDependency};
 pub use error::{CoreError, Result};
 pub use feature::{Feature, FeatureSet};
 pub use package_name::PackageName;
 pub use paths::{absolute_path, default_path, default_prefix, default_source_cache};
+pub use scope::InstallScope;
 pub use target::{Target, TargetArch, TargetOs};
 pub use version::{Version, VersionReq};
-pub use scope::InstallScope;

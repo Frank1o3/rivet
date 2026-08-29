@@ -1,6 +1,6 @@
 package({
     name = "rivet",
-    version = "0.1.5",
+    version = "0.1.6",
 
     description = "A general-purpose, cross-platform package manager",
     license = "BSD-3-Clause",
@@ -13,6 +13,10 @@ package({
     },
 
     build_dependencies = {
+        "rust",
+    },
+
+    cleanup = {
         "rust",
     },
 
@@ -65,10 +69,6 @@ package({
 
     uninstall = function(ctx)
         local prefix = ctx:prefix()
-
-        if ctx:is_symlink(prefix .. "usr/bin/rivet") then
-            ctx:remove_symlink(prefix .. "usr/bin/rivet")
-        end
 
         if ctx:is_symlink(prefix .. "/bin/rivet") then
             ctx:remove_symlink(prefix .. "/bin/rivet")

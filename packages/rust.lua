@@ -28,4 +28,30 @@ package({
             "--without=rust-docs",
         })
     end,
+
+    post_install = function(ctx)
+        local prefix = ctx:prefix()
+        local dest = ctx:destdir()
+        local bin_dir = dest .. "/usr/bin"
+
+        ctx:mkdir(prefix .. "/bin")
+
+        for _, name in ipairs({ "rustc", "cargo", "rustdoc", "rust-gdb", "rust-lldb" }) do
+            local target = bin_dir .. "/" .. name
+            if ctx:exists(target) and ctx:is_symlink(prefix .. "/bin/" .. name) ~= true then
+                ctx:symlink(target, prefix .. "/bin/" .. name)
+            end
+        end
+    end,
+
+    uninstall = function(ctx)
+        local prefix = ctx:prefix()
+
+        for _, name in ipairs({ "rustc", "cargo", "rustdoc", "rust-gdb", "rust-lldb" }) do
+            local link = prefix .. "/bin/" .. name
+            if ctx:is_symlink(link) then
+                ctx:remove_symlink(link)
+            end
+        end
+    end,
 })

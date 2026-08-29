@@ -10,6 +10,12 @@ use crate::error::Result;
 use crate::package_name::PackageName;
 use crate::version::Version;
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecordedDependency {
+    pub name: PackageName,
+    pub runtime: bool,
+}
+
 /// Record of an installed package on the host system.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InstalledRecord {
@@ -19,12 +25,14 @@ pub struct InstalledRecord {
     pub installed_files: Vec<PathBuf>,
     pub installed_at: u64,
     pub is_explicit: bool,
-    /// A snapshot of the recipe script at install time, so `uninstall`
-    /// hooks can still run even if the originating repository no longer
-    /// has this package (or has a different version of it) by the time
-    /// the package is removed.
     #[serde(default)]
     pub recipe_snapshot: Option<String>,
+    /// Dependency edges at install time, used by cleanup to check
+    /// whether something else installed still needs this package at
+    /// runtime. Defaulted for forward-compat with records written
+    /// before this field existed.
+    #[serde(default)]
+    pub dependencies: Vec<RecordedDependency>,
 }
 
 impl InstalledRecord {
@@ -35,6 +43,7 @@ impl InstalledRecord {
         installed_files: Vec<PathBuf>,
         is_explicit: bool,
         recipe_snapshot: Option<String>,
+        dependencies: Vec<RecordedDependency>,
     ) -> Self {
         let installed_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -49,6 +58,7 @@ impl InstalledRecord {
             installed_at,
             is_explicit,
             recipe_snapshot,
+            dependencies,
         }
     }
 }
@@ -154,7 +164,8 @@ mod tests {
             Some("A test tool".to_string()),
             vec![file1.clone()],
             true,
-            None, // recipe_snapshot
+            None,   // recipe_snapshot
+            vec![], // dependencies
         );
 
         db.record_install(record).unwrap();

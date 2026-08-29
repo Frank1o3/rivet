@@ -34,4 +34,23 @@ package({
             "cd '" .. src .. "' && make install",
         })
     end,
+
+    post_install = function(ctx)
+        local prefix = ctx:prefix()
+        local dest = ctx:destdir()
+
+        ctx:mkdir(prefix .. "/bin")
+
+        if ctx:is_symlink(prefix .. "/bin/cava") ~= true then
+            ctx:symlink(dest .. "/usr/bin/cava", prefix .. "/bin/cava")
+        end
+    end,
+
+    uninstall = function(ctx)
+        local prefix = ctx:prefix()
+
+        if ctx:is_symlink(prefix .. "/bin/cava") then
+            ctx:remove_symlink(prefix .. "/bin/cava")
+        end
+    end,
 })

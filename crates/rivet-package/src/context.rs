@@ -253,12 +253,6 @@ impl UserData for BuildContext {
             Ok(this.prefix.to_string_lossy().to_string())
         });
 
-        methods.add_method("prefix", |_, _, ()| {
-            dirs::home_dir()
-                .map(|home| home.join(".local").to_string_lossy().to_string())
-                .ok_or_else(|| mlua::Error::runtime("could not determine user prefix"))
-        });
-
         // ---------------------------------------------------------------------
         // Symbolic links
         // ---------------------------------------------------------------------

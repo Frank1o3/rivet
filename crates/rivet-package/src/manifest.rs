@@ -22,16 +22,12 @@ pub struct PackageManifest {
     pub default_features: Vec<Feature>,
     pub supported_architectures: Vec<TargetArch>,
     pub supported_os: Vec<TargetOs>,
-
-    /// Filesystem path of the `.lua` recipe this manifest was parsed
-    /// from. Empty for manifests built purely in-memory (e.g. tests).
-    /// This only makes sense for local recipes today — a future
-    /// repository backend (git/HTTP) will need its own equivalent, most
-    /// likely "path to the locally cached copy after fetch".
     #[serde(default)]
     pub recipe_path: PathBuf,
     #[serde(default)]
     pub provider_check: Option<ProviderCheck>,
+    #[serde(default)]
+    pub cleanup: Vec<PackageName>,
 }
 
 impl PackageManifest {

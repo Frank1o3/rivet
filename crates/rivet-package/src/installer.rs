@@ -1,27 +1,16 @@
-//! Orchestrates the source → build → install pipeline for a resolved
-//! package, and its inverse at removal time.
-//!
-//! What this does NOT do yet: fetch remote sources. `Source::Archive` and
-//! `Source::Git` are rejected with a clear error until a fetch mechanism
-//! exists (tracked separately — see the project roadmap, "implement
-//! package downloading/building"). `Source::Local` works today, which is
-//! enough to develop and test the hook pipeline itself.
-
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use rivet_core::{InstalledDatabase, InstalledRecord};
+use rivet_core::{InstalledDatabase, InstalledRecord, PackageName, RecordedDependency};
 use walkdir::WalkDir;
 
 use crate::context::BuildContext;
+use crate::dependency::DependencyKind;
 use crate::error::{PackageError, Result};
 use crate::loader::PackageLoader;
 use crate::manifest::PackageManifest;
 use crate::source::Source;
 
-/// Installs a single resolved package into `prefix`, running its
-/// `pre_install`, `build`, `install`, and `post_install` hooks in order,
-/// and records the result in `db`.
 pub fn install(
     manifest: &PackageManifest,
     prefix: &Path,
@@ -55,6 +44,15 @@ pub fn install(
 
     let installed_files = collect_installed_files(&dest_dir);
 
+    let recorded_dependencies = manifest
+        .dependencies
+        .iter()
+        .map(|dep| RecordedDependency {
+            name: dep.name.clone(),
+            runtime: dep.kind == DependencyKind::Runtime,
+        })
+        .collect();
+
     let record = InstalledRecord::new(
         manifest.name.clone(),
         manifest.version.clone(),
@@ -62,11 +60,59 @@ pub fn install(
         installed_files,
         is_explicit,
         Some(script),
+        recorded_dependencies,
     );
 
     db.record_install(record.clone())?;
 
+    for candidate in &manifest.cleanup {
+        if let Some(removed) = try_cleanup(candidate, db, prefix)? {
+            println!(
+                "🧹 cleaned up build-only dependency '{}' v{} (no longer needed at runtime)",
+                removed.name, removed.version
+            );
+        }
+    }
+
     Ok(record)
+}
+
+fn try_cleanup(
+    candidate: &PackageName,
+    db: &mut InstalledDatabase,
+    prefix: &Path,
+) -> Result<Option<InstalledRecord>> {
+    let Some(record) = db.get(candidate) else {
+        return Ok(None);
+    };
+
+    if record.is_explicit {
+        return Ok(None);
+    }
+
+    let still_needed_at_runtime = db.list_installed().iter().any(|installed| {
+        installed
+            .dependencies
+            .iter()
+            .any(|dep| dep.runtime && &dep.name == candidate)
+    });
+
+    if still_needed_at_runtime {
+        return Ok(None);
+    }
+
+    let record = record.clone();
+
+    if let Err(e) = uninstall(&record, prefix) {
+        eprintln!(
+            "⚠️  cleanup uninstall hook for '{}' failed: {}. Continuing with file removal anyway.",
+            record.name, e
+        );
+    }
+
+    db.remove_package(candidate)?;
+
+    Ok(Some(record))
 }
 
 /// Runs a package's `uninstall` hook, if it defined one, using the recipe

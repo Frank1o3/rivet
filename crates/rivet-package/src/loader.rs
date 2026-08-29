@@ -154,6 +154,33 @@ fn parse_package_table(table: &Table) -> std::result::Result<PackageManifest, St
         }
     }
 
+    // 5b. Cleanup — names must already be present as build dependencies.
+    // Cleanup is not a backdoor for removing a runtime dependency out
+    // from under yourself.
+    let mut cleanup = Vec::new();
+    if let Ok(cleanup_table) = table.get::<Table>("cleanup") {
+        for value in cleanup_table.sequence_values::<Value>() {
+            let val = value.map_err(|e| format!("invalid cleanup entry: {}", e))?;
+            let name_str = match val {
+                Value::String(s) => s.to_str().map_err(|e| e.to_string())?.to_string(),
+                _ => return Err("cleanup entries must be strings (package names)".to_string()),
+            };
+            let name = PackageName::new(name_str).map_err(|e| e.to_string())?;
+
+            let is_build_dep = dependencies
+                .iter()
+                .any(|d: &Dependency| d.name == name && d.kind == DependencyKind::Build);
+            if !is_build_dep {
+                return Err(format!(
+                    "cleanup entry '{}' must also be listed in build_dependencies",
+                    name
+                ));
+            }
+
+            cleanup.push(name);
+        }
+    }
+
     // 6. Features
     let mut features = HashMap::new();
     let mut default_features = Vec::new();
@@ -232,6 +259,7 @@ fn parse_package_table(table: &Table) -> std::result::Result<PackageManifest, St
         homepage,
         source,
         dependencies,
+        cleanup,
         features,
         default_features,
         supported_architectures,

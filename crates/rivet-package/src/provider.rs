@@ -1,10 +1,6 @@
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
-/// Describes how to detect that a package's functionality is already
-/// available on the host system, so Rivet can skip building/installing
-/// it and just use what's there — e.g. a `rust` package that's happy to
-/// defer to a `rustc` already put on PATH by rustup, homebrew, the
-/// system package manager, or anything else Rivet didn't install.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProviderCheck {
     /// Executable to look for on PATH, e.g. "rustc".
@@ -19,11 +15,24 @@ fn default_version_flag() -> String {
 }
 
 impl ProviderCheck {
-    /// Runs the check against the real system. Returns the detected
-    /// version if the command exists, ran successfully, and its output
-    /// contained something that parses as a semantic version.
     pub fn detect(&self) -> Option<rivet_core::Version> {
-        let output = std::process::Command::new(&self.command)
+        if let Some(version) = self.detect_via_command(&self.command) {
+            return Some(version);
+        }
+
+        if let Some(user_bin) = self.sudo_user_cargo_bin() {
+            return self.detect_via_command(user_bin);
+        }
+
+        None
+    }
+
+    /// Runs `<command_path> <version_flag>` and extracts a semver from stdout.
+    fn detect_via_command(
+        &self,
+        command_path: impl AsRef<std::ffi::OsStr>,
+    ) -> Option<rivet_core::Version> {
+        let output = std::process::Command::new(command_path)
             .arg(&self.version_flag)
             .output()
             .ok()?;
@@ -35,11 +44,23 @@ impl ProviderCheck {
         let text = String::from_utf8_lossy(&output.stdout);
         extract_version(&text)
     }
+
+    /// done here to keep this patch minimal.
+    fn sudo_user_cargo_bin(&self) -> Option<PathBuf> {
+        let invoking_user = std::env::var("SUDO_USER").ok()?;
+        if invoking_user == "root" {
+            return None;
+        }
+
+        let candidate = PathBuf::from("/home")
+            .join(invoking_user)
+            .join(".cargo/bin")
+            .join(&self.command);
+
+        candidate.is_file().then_some(candidate)
+    }
 }
 
-/// Scans whitespace/punctuation-delimited tokens in `text` for the first
-/// one that parses as a semver version, e.g. pulls "1.75.0" out of
-/// "rustc 1.75.0 (82e1608df 2023-12-21)".
 fn extract_version(text: &str) -> Option<rivet_core::Version> {
     text.split(|c: char| c.is_whitespace() || matches!(c, ',' | '(' | ')'))
         .find_map(|token| {
