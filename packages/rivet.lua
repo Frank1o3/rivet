@@ -1,6 +1,6 @@
 package({
     name = "rivet",
-    version = "0.1.6",
+    version = "0.1.7",
 
     description = "A general-purpose, cross-platform package manager",
     license = "BSD-3-Clause",
@@ -34,16 +34,17 @@ package({
         local src = ctx:source_dir()
         local dest = ctx:destdir()
 
-        local binary = src .. "/target/release/rivet-cli"
+        local bin = src .. "/target/release/rivet-cli"
+        local dep = src .. "/target/release/rivet-cli.d"
 
-        if not ctx:exists(binary) then
-            error("Rivet binary was not produced: " .. binary)
+        if not ctx:exists(bin) then
+            error("Rivet binary was not produced: " .. bin)
         end
 
         ctx:mkdir(dest .. "/usr/bin")
 
         ctx:copy(
-            binary,
+            bin,
             dest .. "/usr/bin/rivet"
         )
 
@@ -51,6 +52,13 @@ package({
             dest .. "/usr/bin/rivet",
             "755"
         )
+
+        if ctx:exists(dep) then
+            ctx:copy(
+                dep,
+                dest .. "/usr/bin/rivet.d"
+            )
+        end
     end,
 
     post_install = function(ctx)
@@ -59,10 +67,12 @@ package({
 
         ctx:mkdir(prefix .. "/bin")
 
-        if ctx:is_symlink(prefix .. "/bin/rivet") ~= true then
+        local link = prefix .. "/bin/rivet"
+
+        if ctx:is_symlink(link) ~= true then
             ctx:symlink(
                 dest .. "/usr/bin/rivet",
-                prefix .. "/bin/rivet"
+                link
             )
         end
     end,

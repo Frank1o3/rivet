@@ -10,6 +10,7 @@ pub fn absolute_path(path: PathBuf) -> anyhow::Result<PathBuf> {
 }
 
 /// Default location for cached package sources.
+///
 /// Override with `RIVET_CACHE`.
 pub fn default_source_cache() -> anyhow::Result<PathBuf> {
     let path = if let Ok(path) = std::env::var("RIVET_CACHE") {
@@ -17,14 +18,15 @@ pub fn default_source_cache() -> anyhow::Result<PathBuf> {
     } else {
         dirs::home_dir()
             .ok_or_else(|| anyhow::anyhow!("could not determine home directory"))?
-            .join(".rivet")
-            .join("cache")
+            .join(".cache")
+            .join("rivet")
     };
 
     absolute_path(path)
 }
 
-/// Default database location for the current user/system.
+/// Default database location.
+///
 /// Override with `RIVET_DB`.
 pub fn default_path() -> anyhow::Result<PathBuf> {
     let path = if let Ok(path) = std::env::var("RIVET_DB") {
@@ -39,16 +41,18 @@ pub fn default_path() -> anyhow::Result<PathBuf> {
     absolute_path(path)
 }
 
-/// Default installation prefix for the current user/system.
+/// Default installation prefix.
+///
 /// Override with `RIVET_PREFIX`.
+///
+/// For a normal user installation this defaults to `$HOME/.local`.
 pub fn default_prefix() -> anyhow::Result<PathBuf> {
     let path = if let Ok(path) = std::env::var("RIVET_PREFIX") {
         PathBuf::from(path)
     } else {
         dirs::home_dir()
             .ok_or_else(|| anyhow::anyhow!("could not determine home directory"))?
-            .join(".rivet")
-            .join("store")
+            .join(".local")
     };
 
     absolute_path(path)
