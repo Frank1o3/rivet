@@ -72,6 +72,12 @@ function BuildContext:get_env(key) end
 ---@param args string[]?
 function BuildContext:run(cmd, args) end
 
+---Runs a subprocess inside the specified directory.
+---@param path string
+---@param cmd string
+---@param args string[]?
+function BuildContext:run_in(path, cmd, args) end
+
 ---Returns whether a path exists.
 ---@param path string
 ---@return boolean
@@ -134,6 +140,11 @@ function BuildContext:remove_dir_all(path) end
 ---@param link string
 function BuildContext:symlink(target, link) end
 
+---Absolute path to the current user's installation prefix.
+---Defaults to `$HOME/.local`.
+---@return string
+function BuildContext:prefix() end
+
 ---Removes a symbolic link.
 ---Fails if `path` is not a symbolic link.
 ---@param path string
@@ -142,7 +153,7 @@ function BuildContext:remove_symlink(path) end
 ---Changes file or directory permissions.
 ---On Unix, `mode` uses standard permission bits, e.g. `0o755`.
 ---@param path string
----@param mode integer
+---@param mode string
 function BuildContext:chmod(path, mode) end
 
 ---@class RivetPackageDef

@@ -92,8 +92,10 @@ fn resolve_source(manifest: &PackageManifest, cache_dir: &Path) -> Result<PathBu
             let dir = tempfile::tempdir().map_err(PackageError::Io)?;
             Ok(dir.keep().to_path_buf())
         }
+
         Some(Source::Local { path }) => {
             let p = PathBuf::from(path);
+
             if p.is_absolute() {
                 Ok(p)
             } else {
@@ -101,20 +103,20 @@ fn resolve_source(manifest: &PackageManifest, cache_dir: &Path) -> Result<PathBu
                     .recipe_path
                     .parent()
                     .unwrap_or_else(|| Path::new("."));
+
                 Ok(base.join(p))
             }
         }
+
         Some(Source::Git {
             url,
             reference,
             checksum: _,
         }) => crate::fetch::fetch_git(url, reference.as_ref(), cache_dir),
-        Some(Source::Archive { .. }) => Err(PackageError::InvalidField {
-            field: "source",
-            reason: "fetching archive sources isn't implemented yet — use a `git` or \
-                         `local` source for now"
-                .to_string(),
-        }),
+
+        Some(Source::Archive { url, checksum }) => {
+            crate::fetch::fetch_archive(url, checksum, cache_dir)
+        }
     }
 }
 

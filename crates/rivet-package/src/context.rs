@@ -121,6 +121,45 @@ impl UserData for BuildContext {
             },
         );
 
+        methods.add_method(
+            "run_in",
+            |_, this, (path, cmd, args_val): (String, String, Option<Table>)| {
+                let mut cmd_builder = Command::new(&cmd);
+
+                cmd_builder.current_dir(&path);
+
+                for (k, v) in &this.env_vars {
+                    cmd_builder.env(k, v);
+                }
+
+                cmd_builder.env("DESTDIR", &this.dest_dir);
+
+                if let Some(args_table) = args_val {
+                    for arg in args_table.sequence_values::<String>() {
+                        cmd_builder.arg(arg?);
+                    }
+                }
+
+                println!("  [build] Running in '{}': {} ...", path, cmd);
+
+                let status = cmd_builder.status().map_err(|e| {
+                    mlua::Error::runtime(format!(
+                        "failed to execute '{}' in '{}': {}",
+                        cmd, path, e
+                    ))
+                })?;
+
+                if !status.success() {
+                    return Err(mlua::Error::runtime(format!(
+                        "command '{}' failed with exit status {:?}",
+                        cmd, status
+                    )));
+                }
+
+                Ok(())
+            },
+        );
+
         // ---------------------------------------------------------------------
         // Filesystem inspection
         // ---------------------------------------------------------------------
@@ -213,6 +252,12 @@ impl UserData for BuildContext {
             Ok(())
         });
 
+        methods.add_method("prefix", |_, _, ()| {
+            dirs::home_dir()
+                .map(|home| home.join(".local").to_string_lossy().to_string())
+                .ok_or_else(|| mlua::Error::runtime("could not determine user prefix"))
+        });
+
         // ---------------------------------------------------------------------
         // Symbolic links
         // ---------------------------------------------------------------------
@@ -267,7 +312,7 @@ impl UserData for BuildContext {
         // File permissions
         // ---------------------------------------------------------------------
 
-        methods.add_method("chmod", |_, _, (path, mode): (String, u32)| {
+        methods.add_method("chmod", |_, _, (path, mode): (String, String)| {
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
@@ -276,6 +321,8 @@ impl UserData for BuildContext {
                     fs::metadata(&path).map_err(|e| mlua::Error::runtime(e.to_string()))?;
 
                 let mut permissions = metadata.permissions();
+                let mode = u32::from_str_radix(&mode, 8)
+                    .map_err(|e| mlua::Error::runtime(e.to_string()))?;
                 permissions.set_mode(mode);
 
                 fs::set_permissions(&path, permissions)

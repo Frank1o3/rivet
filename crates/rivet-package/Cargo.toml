@@ -7,13 +7,19 @@
     version.workspace=true
 
 [dependencies]
+    bzip2.workspace=true
     dirs.workspace=true
+    flate2.workspace=true
     mlua={version="0.12.0", features=["lua54", "vendored"]}
+    reqwest.workspace=true
     rivet-core.workspace=true
     serde.workspace=true
+    tar.workspace=true
     tempfile.workspace=true
     thiserror.workspace=true
     walkdir.workspace=true
+    xz2.workspace=true
+    zip.workspace=true
 
 [dev-dependencies]
     serde_json.workspace=true
