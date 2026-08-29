@@ -8,6 +8,7 @@
 
 [dependencies]
     anyhow.workspace=true
+    dirs.workspace=true
     hex.workspace=true
     semver.workspace=true
     serde.workspace=true
