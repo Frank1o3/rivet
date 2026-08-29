@@ -73,7 +73,11 @@ fn main() -> anyhow::Result<()> {
                 Some(path) => rivet_core::absolute_path(path)?,
                 None => scope.default_prefix()?,
             };
-            commands::remove::execute(&mut db, &package, &prefix)?;
+            let cache_dir = match cli.cache {
+                Some(path) => rivet_core::absolute_path(path)?,
+                None => rivet_core::default_source_cache()?,
+            };
+            commands::remove::execute(&mut db, &package, &cache_dir, &prefix)?;
         }
         args::Commands::List => {
             let scope = if cli.system {

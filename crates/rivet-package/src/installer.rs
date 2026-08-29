@@ -30,7 +30,7 @@ pub fn install(
 
     let source_dir = resolve_source(manifest, cache_dir)?;
     let build_dir = tempfile::tempdir().map_err(PackageError::Io)?;
-    let dest_dir = prefix.join(format!("{}-{}", manifest.name, manifest.version));
+    let dest_dir = cache_dir.join(format!("{}-{}", manifest.name, manifest.version));
     fs::create_dir_all(&dest_dir).map_err(PackageError::Io)?;
 
     let ctx = BuildContext::new(&source_dir, build_dir.path(), &dest_dir, prefix);
@@ -66,7 +66,7 @@ pub fn install(
     db.record_install(record.clone())?;
 
     for candidate in &manifest.cleanup {
-        if let Some(removed) = try_cleanup(candidate, db, prefix)? {
+        if let Some(removed) = try_cleanup(candidate, db, cache_dir, prefix)? {
             println!(
                 "🧹 cleaned up build-only dependency '{}' v{} (no longer needed at runtime)",
                 removed.name, removed.version
@@ -80,6 +80,7 @@ pub fn install(
 fn try_cleanup(
     candidate: &PackageName,
     db: &mut InstalledDatabase,
+    cache_dir: &Path,
     prefix: &Path,
 ) -> Result<Option<InstalledRecord>> {
     let Some(record) = db.get(candidate) else {
@@ -103,7 +104,7 @@ fn try_cleanup(
 
     let record = record.clone();
 
-    if let Err(e) = uninstall(&record, prefix) {
+    if let Err(e) = uninstall(&record, cache_dir, prefix) {
         eprintln!(
             "⚠️  cleanup uninstall hook for '{}' failed: {}. Continuing with file removal anyway.",
             record.name, e
@@ -118,12 +119,12 @@ fn try_cleanup(
 /// Runs a package's `uninstall` hook, if it defined one, using the recipe
 /// snapshot taken at install time — deliberately independent of whatever
 /// the repository currently contains.
-pub fn uninstall(record: &InstalledRecord, prefix: &Path) -> Result<()> {
+pub fn uninstall(record: &InstalledRecord, cache_dir: &Path, prefix: &Path) -> Result<()> {
     let Some(script) = &record.recipe_snapshot else {
         return Ok(());
     };
 
-    let dest_dir = prefix.join(format!("{}-{}", record.name, record.version));
+    let dest_dir = cache_dir.join(format!("{}-{}", record.name, record.version));
     let ctx = BuildContext::new(&dest_dir, &dest_dir, &dest_dir, prefix);
 
     let loader = PackageLoader::new()?;

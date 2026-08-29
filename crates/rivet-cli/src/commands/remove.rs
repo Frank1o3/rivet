@@ -5,6 +5,7 @@ use rivet_core::{InstalledDatabase, PackageName};
 pub fn execute(
     db: &mut InstalledDatabase,
     package_name_str: &str,
+    cache_dir: &Path,
     prefix: &Path,
 ) -> anyhow::Result<()> {
     let name = PackageName::new(package_name_str)?;
@@ -16,7 +17,7 @@ pub fn execute(
 
     println!("🗑️  Removing package '{}'...", name);
 
-    if let Err(e) = rivet_package::uninstall(&record, prefix) {
+    if let Err(e) = rivet_package::uninstall(&record, cache_dir, prefix) {
         eprintln!(
             "⚠️  uninstall hook for '{}' failed: {}. Continuing with file removal anyway.",
             name, e

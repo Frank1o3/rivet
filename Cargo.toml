@@ -8,7 +8,7 @@
         edition="2024"
         license="BSD-3-Clause"
         repository="https://github.com/Frank1o3/rivet.git"
-        version="0.1.7"
+        version="0.1.8"
 
     [workspace.dependencies]
         rivet-cli={path="crates/rivet-cli"}
