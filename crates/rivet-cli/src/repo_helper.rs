@@ -4,7 +4,6 @@ use rivet_repository::{
     LocalRepository, MultiRepositoryManager, RemoteRepository, RepositoryLoader,
 };
 
-
 const LOCAL_REPO_PRIORITY: i32 = 1000;
 const REMOTE_REPO_PRIORITY: i32 = 10;
 
@@ -48,11 +47,19 @@ fn load_remote_repositories(multi: &mut MultiRepositoryManager) -> anyhow::Resul
             continue;
         };
 
+        if slug == "local" {
+            eprintln!(
+                "  skipping '{}': 'local' is reserved for the local pseudo-repository",
+                path.display()
+            );
+            continue;
+        }
+
         let definition = match loader.load_from_file(&path) {
             Ok(def) => def,
             Err(e) => {
                 eprintln!(
-                    "⚠️  failed to load repository definition '{}': {e}",
+                    "  failed to load repository definition '{}': {e}",
                     path.display()
                 );
                 continue;

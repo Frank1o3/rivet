@@ -31,6 +31,9 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
+    /// Set up Rivet's data directory and configure the official repository
+    Init,
+
     /// Install packages by resolving dependencies and executing build/install hooks
     Install {
         /// Package name(s) or constraints to install (e.g. "neovim", "zlib >= 1.3")

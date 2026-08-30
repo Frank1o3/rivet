@@ -61,6 +61,7 @@ pub fn install(
         is_explicit,
         Some(script),
         recorded_dependencies,
+        manifest.source_repository.clone(),
     );
 
     db.record_install(record.clone())?;

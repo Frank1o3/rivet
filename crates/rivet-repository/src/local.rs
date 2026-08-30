@@ -46,7 +46,8 @@ impl LocalRepository {
         {
             let path = entry.path();
             if path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("lua") {
-                if let Ok(manifest) = loader.load_from_file(path) {
+                if let Ok(mut manifest) = loader.load_from_file(path) {
+                    manifest.source_repository = Some(self.name.clone());
                     self.index.add(manifest);
                     count += 1;
                 }
@@ -85,7 +86,6 @@ mod tests {
         let dir = tempdir().unwrap();
         let root = dir.path();
 
-        // Create packages/zlib/zlib.lua
         let zlib_dir = root.join("packages/zlib");
         fs::create_dir_all(&zlib_dir).unwrap();
         fs::write(
@@ -94,7 +94,6 @@ mod tests {
         )
         .unwrap();
 
-        // Create packages/libpng.lua
         let libpng_file = root.join("packages/libpng.lua");
         fs::write(
             libpng_file,
@@ -109,8 +108,8 @@ mod tests {
         assert_eq!(repo.index.len(), 2);
         let zlib = repo.index.get(&PackageName::new("zlib").unwrap()).unwrap();
         assert_eq!(zlib[0].version.to_string(), "1.3.1");
+        assert_eq!(zlib[0].source_repository.as_deref(), Some("test-repo"));
 
-        // Test search
         let search_results = repo.index.search("compression");
         assert_eq!(search_results.len(), 1);
         assert_eq!(search_results[0].name.as_str(), "zlib");

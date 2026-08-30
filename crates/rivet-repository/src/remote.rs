@@ -153,8 +153,13 @@ impl RemoteRepository {
             let checksum: Checksum = format!("sha256:{}", entry.sha.sha256).parse()?;
             if checksum.verify(&existing).is_ok() {
                 let loader = PackageLoader::new()?;
-                return Ok(loader.load_from_file(&dest)?);
+                let mut manifest = loader.load_from_file(&dest)?;
+                manifest.source_repository = Some(self.slug.clone());
+                return Ok(manifest);
             }
+            // On-disk copy doesn't match the published checksum anymore
+            // (index was updated, or local tampering) — fall through and
+            // re-fetch rather than trusting stale content.
         }
 
         self.fetch_and_write(entry, &dest)
@@ -179,7 +184,9 @@ impl RemoteRepository {
         fs::write(dest, &bytes).map_err(RepositoryError::Io)?;
 
         let loader = PackageLoader::new()?;
-        Ok(loader.load_from_file(dest)?)
+        let mut manifest = loader.load_from_file(dest)?;
+        manifest.source_repository = Some(self.slug.clone());
+        Ok(manifest)
     }
 
     fn git_show(&self, repo_relative_path: &str) -> Result<Vec<u8>> {

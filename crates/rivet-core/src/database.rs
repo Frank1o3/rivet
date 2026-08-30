@@ -27,12 +27,10 @@ pub struct InstalledRecord {
     pub is_explicit: bool,
     #[serde(default)]
     pub recipe_snapshot: Option<String>,
-    /// Dependency edges at install time, used by cleanup to check
-    /// whether something else installed still needs this package at
-    /// runtime. Defaulted for forward-compat with records written
-    /// before this field existed.
     #[serde(default)]
     pub dependencies: Vec<RecordedDependency>,
+    #[serde(default)]
+    pub source_repository: Option<String>,
 }
 
 impl InstalledRecord {
@@ -44,6 +42,7 @@ impl InstalledRecord {
         is_explicit: bool,
         recipe_snapshot: Option<String>,
         dependencies: Vec<RecordedDependency>,
+        source_repository: Option<String>,
     ) -> Self {
         let installed_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -59,6 +58,7 @@ impl InstalledRecord {
             is_explicit,
             recipe_snapshot,
             dependencies,
+            source_repository,
         }
     }
 }
@@ -149,7 +149,6 @@ mod tests {
         let tmp = tempdir().unwrap();
         let db_file = tmp.path().join("db.json");
 
-        // 1. Create files
         let file1 = tmp.path().join("bin/my-bin");
         fs::create_dir_all(tmp.path().join("bin")).unwrap();
         fs::write(&file1, "binary").unwrap();
@@ -164,22 +163,25 @@ mod tests {
             Some("A test tool".to_string()),
             vec![file1.clone()],
             true,
-            None,   // recipe_snapshot
-            vec![], // dependencies
+            None,
+            vec![],
+            Some("local".to_string()),
         );
 
         db.record_install(record).unwrap();
         assert!(db.is_installed(&name));
         assert_eq!(db.list_installed().len(), 1);
+        assert_eq!(
+            db.get(&name).unwrap().source_repository.as_deref(),
+            Some("local")
+        );
 
-        // Reload DB from file
         let mut db2 = InstalledDatabase::open(&db_file).unwrap();
         assert!(db2.is_installed(&name));
 
-        // Remove package
         let removed = db2.remove_package(&name).unwrap();
         assert!(removed.is_some());
         assert!(!db2.is_installed(&name));
-        assert!(!file1.exists()); // Tracked file was safely deleted
+        assert!(!file1.exists());
     }
 }

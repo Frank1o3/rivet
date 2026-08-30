@@ -28,6 +28,8 @@ pub struct PackageManifest {
     pub provider_check: Option<ProviderCheck>,
     #[serde(default)]
     pub cleanup: Vec<PackageName>,
+    #[serde(default)]
+    pub source_repository: Option<String>,
 }
 
 impl PackageManifest {

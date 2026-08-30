@@ -266,6 +266,7 @@ fn parse_package_table(table: &Table) -> std::result::Result<PackageManifest, St
         supported_os,
         recipe_path: PathBuf::new(),
         provider_check,
+        source_repository: None,
     })
 }
 

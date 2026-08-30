@@ -9,6 +9,9 @@ fn main() -> anyhow::Result<()> {
     let cli = args::Cli::parse();
 
     match cli.command {
+        args::Commands::Init => {
+            commands::init::execute()?;
+        }
         args::Commands::Install {
             packages,
             dry_run,
