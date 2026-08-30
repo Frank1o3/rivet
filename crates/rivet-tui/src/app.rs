@@ -30,7 +30,7 @@ impl App {
             if std::path::Path::new(dir).exists() {
                 let mut r = LocalRepository::open(dir, "local");
                 let _ = r.scan_and_index();
-                repos.add_repository(r, 10, true);
+                repos.add_local_repository(r, 10, true);
                 break;
             }
         }
