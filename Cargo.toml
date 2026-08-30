@@ -8,7 +8,7 @@
         edition="2024"
         license="BSD-3-Clause"
         repository="https://github.com/Frank1o3/rivet.git"
-        version="0.1.8"
+        version="0.1.9"
 
     [workspace.dependencies]
         rivet-cli={path="crates/rivet-cli"}
@@ -17,24 +17,21 @@
         rivet-repository={path="crates/rivet-repository"}
         rivet-resolver={path="crates/rivet-resolver"}
 
-        bzip2="0.6"
-        flate2="1.1.9"
-        reqwest={version="0.13.4", features=["blocking", "brotli", "deflate", "gzip", "rustls", "zstd"]}
-        tar="0.4.46"
-        xz2="0.1.7"
-        zip="8.6.0"
-
         anyhow="1.0"
-        thiserror="2.0"
-
+        bzip2="0.6"
+        dirs="6.0.0"
+        flate2="1.1.9"
+        hex="0.4.3"
+        libc="0.2.189"
+        mlua={version="0.12.1", features=["lua54", "vendored"]}
+        reqwest={version="0.13.4", features=["blocking", "brotli", "deflate", "gzip", "rustls", "zstd"]}
+        semver={version="1.0", features=["serde"]}
         serde={version="1.0", features=["derive"]}
         serde_json="1.0"
-
-        hex="0.4.3"
-        semver={version="1.0", features=["serde"]}
         sha2="0.11.0"
-
-        dirs="6.0.0"
-        libc="0.2.189"
+        tar="0.4.46"
         tempfile="3.17"
+        thiserror="2.0"
         walkdir="2.5"
+        xz2="0.1.7"
+        zip="8.6.0"

@@ -22,6 +22,18 @@ pub enum RepositoryError {
 
     #[error("failed to synchronize repository '{name}': {reason}")]
     SyncFailed { name: String, reason: String },
+
+    #[error("Lua runtime error: {0}")]
+    Lua(String),
+
+    #[error("invalid repository definition: {0}")]
+    Definition(String),
 }
 
 pub type Result<T, E = RepositoryError> = std::result::Result<T, E>;
+
+impl From<mlua::Error> for RepositoryError {
+    fn from(err: mlua::Error) -> Self {
+        RepositoryError::Lua(err.to_string())
+    }
+}

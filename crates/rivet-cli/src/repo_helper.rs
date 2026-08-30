@@ -9,7 +9,7 @@ pub fn load_repositories(explicit_path: Option<&Path>) -> anyhow::Result<MultiRe
     if let Some(path) = explicit_path {
         let mut repo = LocalRepository::open(path, "custom");
         repo.scan_and_index()?;
-        multi.add_repository(repo, 10, true);
+        multi.add_local_repository(repo, 10, true);
         return Ok(multi);
     }
 
@@ -26,7 +26,7 @@ pub fn load_repositories(explicit_path: Option<&Path>) -> anyhow::Result<MultiRe
             let mut repo = LocalRepository::open(candidate, "local");
             if let Ok(count) = repo.scan_and_index() {
                 if count > 0 {
-                    multi.add_repository(repo, 10, true);
+                    multi.add_local_repository(repo, 10, true);
                     found = true;
                     break;
                 }
@@ -37,7 +37,7 @@ pub fn load_repositories(explicit_path: Option<&Path>) -> anyhow::Result<MultiRe
     if !found {
         // Fallback: create an empty local repo in current dir
         let repo = LocalRepository::open(".", "local");
-        multi.add_repository(repo, 10, true);
+        multi.add_local_repository(repo, 10, true);
     }
 
     Ok(multi)

@@ -10,6 +10,7 @@ package({
         type = "git",
         url = "https://github.com/Frank1o3/rivet.git",
         branch = "main",
+        
     },
 
     build_dependencies = {

@@ -9,16 +9,18 @@ pub fn execute(repos: &MultiRepositoryManager, query: &str) -> anyhow::Result<()
     }
 
     println!("Found {} package(s) matching '{}':\n", results.len(), query);
-    println!("{:<24} {:<12} {}", "PACKAGE", "VERSION", "DESCRIPTION");
-    println!("{:-<70}", "");
+    println!(
+        "{:<24} {:<12} {:<12} {}",
+        "PACKAGE", "VERSION", "REPOSITORY", "DESCRIPTION"
+    );
+    println!("{:-<80}", "");
 
-    for manifest in results {
-        let desc = manifest.description.as_deref().unwrap_or("-");
+    for pkg in results {
+        let version = pkg.version.as_deref().unwrap_or("-");
+        let desc = pkg.description.as_deref().unwrap_or("-");
         println!(
-            "{:<24} {:<12} {}",
-            manifest.name.as_str(),
-            manifest.version.to_string(),
-            desc
+            "{:<24} {:<12} {:<12} {}",
+            pkg.name, version, pkg.repository, desc
         );
     }
 
