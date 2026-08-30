@@ -1,8 +1,15 @@
 use rivet_repository::MultiRepositoryManager;
 
 pub fn execute(repos: &mut MultiRepositoryManager) -> anyhow::Result<()> {
-    println!("🔄 Synchronizing repositories...");
+    println!("🔄 Refreshing local package repositories...");
     let indexed = repos.scan_all()?;
-    println!("✅ Sync complete. Indexed {} package definitions.", indexed);
+    println!(
+        "✅ Refresh complete. {} package definition(s) currently available.",
+        indexed
+    );
+    println!(
+        "(Rescans local files and reloads cached repository indexes — no network access. \
+         Run 'rivet update' to fetch new data from remote repositories.)"
+    );
     Ok(())
 }

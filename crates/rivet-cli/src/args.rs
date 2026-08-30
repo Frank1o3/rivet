@@ -79,4 +79,14 @@ pub enum Commands {
         #[arg(long)]
         check_only: bool,
     },
+
+    /// Fetch the latest package information from all configured remote repositories
+    Update,
+
+    /// Upgrade installed packages to newer versions found during the last update
+    Upgrade {
+        /// Preview available upgrades without making changes
+        #[arg(short = 'd', long)]
+        dry_run: bool,
+    },
 }

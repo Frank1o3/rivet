@@ -16,7 +16,11 @@ pub use database::{InstalledDatabase, InstalledRecord, RecordedDependency};
 pub use error::{CoreError, Result};
 pub use feature::{Feature, FeatureSet};
 pub use package_name::PackageName;
-pub use paths::{absolute_path, default_path, default_prefix, default_source_cache};
+pub use paths::{
+    absolute_path, default_data_dir, default_local_packages_dir, default_packages_dir,
+    default_path, default_prefix, default_repo_mirror_cache, default_repositories_dir,
+    default_source_cache,
+};
 pub use scope::InstallScope;
 pub use target::{Target, TargetArch, TargetOs};
 pub use version::{Version, VersionReq};

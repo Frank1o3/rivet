@@ -106,6 +106,10 @@ impl RemoteRepository {
         self.index.borrow().as_ref().map(Vec::len).unwrap_or(0)
     }
 
+    pub fn invalidate_index(&self) {
+        *self.index.borrow_mut() = None;
+    }
+
     pub fn load_index(&self) -> Result<()> {
         if self.index.borrow().is_some() {
             return Ok(());

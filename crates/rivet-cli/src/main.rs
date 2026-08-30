@@ -92,6 +92,36 @@ fn main() -> anyhow::Result<()> {
             let db = InstalledDatabase::open(db_path)?;
             commands::list::execute(&db)?;
         }
+        args::Commands::Update => {
+            let mut repos = repo_helper::load_repositories(cli.repo.as_deref())?;
+            commands::update::execute(&mut repos)?;
+        }
+        args::Commands::Upgrade { dry_run } => {
+            let repos = repo_helper::load_repositories(cli.repo.as_deref())?;
+
+            let scope = if cli.system {
+                rivet_core::InstallScope::System
+            } else {
+                rivet_core::InstallScope::User
+            };
+            scope.check_permitted()?;
+
+            let db_path = match cli.db {
+                Some(path) => rivet_core::absolute_path(path)?,
+                None => scope.default_db_path()?,
+            };
+            let prefix = match cli.prefix {
+                Some(path) => rivet_core::absolute_path(path)?,
+                None => scope.default_prefix()?,
+            };
+            let cache_dir = match cli.cache {
+                Some(path) => rivet_core::absolute_path(path)?,
+                None => rivet_core::default_source_cache()?,
+            };
+
+            let mut db = InstalledDatabase::open(db_path)?;
+            commands::upgrade::execute(&repos, &mut db, &prefix, &cache_dir, dry_run)?;
+        }
     }
 
     Ok(())

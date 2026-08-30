@@ -22,6 +22,12 @@ pub struct RepositoryEntry {
     pub enabled: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct RemoteUpdateResult {
+    pub slug: String,
+    pub outcome: std::result::Result<usize, String>,
+}
+
 /// Manages multiple local- or remote-backed repositories and provides a
 /// unified `PackageProvider`.
 #[derive(Debug, Default, Clone)]
@@ -103,6 +109,35 @@ impl MultiRepositoryManager {
                 }
             }
         }
+        results
+    }
+
+    pub fn update_remotes(&mut self) -> Vec<RemoteUpdateResult> {
+        let mut results = Vec::new();
+
+        for entry in &self.repositories {
+            if !entry.enabled {
+                continue;
+            }
+            let RepositoryBackend::Remote(repo) = &entry.backend else {
+                continue;
+            };
+
+            let outcome = repo
+                .sync_mirror()
+                .and_then(|()| {
+                    repo.invalidate_index();
+                    repo.load_index()
+                })
+                .map(|()| repo.entry_count())
+                .map_err(|e| e.to_string());
+
+            results.push(RemoteUpdateResult {
+                slug: repo.slug.clone(),
+                outcome,
+            });
+        }
+
         results
     }
 }

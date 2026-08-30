@@ -14,6 +14,6 @@ pub use error::{RepositoryError, Result};
 pub use index::RepositoryIndex;
 pub use loader::RepositoryLoader;
 pub use local::LocalRepository;
-pub use multi::{MultiRepositoryManager, RepositoryBackend, RepositoryEntry};
+pub use multi::{MultiRepositoryManager, RemoteUpdateResult, RepositoryBackend, RepositoryEntry};
 pub use remote::{RemoteIndexChecksum, RemoteIndexEntry, RemoteRepository};
 pub use summary::PackageSummary;
