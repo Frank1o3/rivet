@@ -82,11 +82,24 @@ fn parse_repository_table(table: &Table) -> std::result::Result<RepositoryDefini
         .unwrap_or_else(|_| "main".to_string());
     let path: Option<String> = source_table.get("path").ok();
 
+    let priority: i32 = table
+        .get::<Option<i32>>("priority")
+        .ok()
+        .flatten()
+        .unwrap_or(10);
+    let enabled: bool = table
+        .get::<Option<bool>>("enabled")
+        .ok()
+        .flatten()
+        .unwrap_or(true);
+
     Ok(RepositoryDefinition {
         name,
         description,
         license,
         source: RepositorySource { url, branch, path },
+        priority,
+        enabled,
         definition_path: std::path::PathBuf::new(),
     })
 }
@@ -117,6 +130,26 @@ mod tests {
         assert_eq!(def.license.as_deref(), Some("MIT"));
         assert_eq!(def.source.url, "https://github.com/example/rivet-repo.git");
         assert_eq!(def.source.branch, "stable");
+        assert_eq!(def.priority, 10);
+        assert!(def.enabled);
+    }
+
+    #[test]
+    fn test_load_repository_with_priority_and_enabled() {
+        let script = r#"
+            repository({
+                name = "custom-priority",
+                priority = 50,
+                enabled = false,
+                source = { url = "https://github.com/example/repo.git" },
+            })
+        "#;
+
+        let loader = RepositoryLoader::new().unwrap();
+        let def = loader.load_from_str(script).unwrap();
+        assert_eq!(def.name, "custom-priority");
+        assert_eq!(def.priority, 50);
+        assert!(!def.enabled);
     }
 
     #[test]

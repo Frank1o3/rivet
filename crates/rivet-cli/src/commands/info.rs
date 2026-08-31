@@ -65,6 +65,9 @@ pub fn execute(
         if let Some(homepage) = &manifest.homepage {
             println!("Homepage:     {}", homepage);
         }
+        if let Some(publisher) = &manifest.publisher {
+            println!("Publisher:    {}", publisher);
+        }
 
         if let Some(source) = &manifest.source {
             println!("Source:       {:?}", source);

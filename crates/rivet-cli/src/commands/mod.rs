@@ -1,10 +1,14 @@
+pub mod autoremove;
 pub mod build;
+pub mod clean;
 pub mod info;
 pub mod init;
 pub mod install;
 pub mod list;
 pub mod remove;
+pub mod repo;
 pub mod search;
 pub mod sync;
 pub mod update;
 pub mod upgrade;
+pub mod verify;

@@ -28,8 +28,22 @@ pub struct RepositoryDefinition {
     pub description: Option<String>,
     pub license: Option<String>,
     pub source: RepositorySource,
+    /// Repository lookup priority (higher numbers take precedence). Defaults to 10.
+    #[serde(default = "default_priority")]
+    pub priority: i32,
+    /// Whether this repository is enabled. Defaults to true.
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
     /// Path to the `.lua` file this was loaded from. Empty for
     /// in-memory/test definitions.
     #[serde(default)]
     pub definition_path: PathBuf,
+}
+
+fn default_priority() -> i32 {
+    10
+}
+
+fn default_enabled() -> bool {
+    true
 }

@@ -5,7 +5,6 @@ use rivet_repository::{
 };
 
 const LOCAL_REPO_PRIORITY: i32 = 1000;
-const REMOTE_REPO_PRIORITY: i32 = 10;
 
 pub fn load_repositories(explicit_path: Option<&Path>) -> anyhow::Result<MultiRepositoryManager> {
     let mut multi = MultiRepositoryManager::new();
@@ -66,6 +65,8 @@ fn load_remote_repositories(multi: &mut MultiRepositoryManager) -> anyhow::Resul
             }
         };
 
+        let priority = definition.priority;
+        let enabled = definition.enabled;
         let packages_dir = packages_root.join(slug);
         let repo = RemoteRepository::new(slug, definition, &mirror_root, packages_dir);
 
@@ -74,7 +75,7 @@ fn load_remote_repositories(multi: &mut MultiRepositoryManager) -> anyhow::Resul
         // nothing until `rivet update` runs.
         let _ = repo.load_index();
 
-        multi.add_remote_repository(repo, REMOTE_REPO_PRIORITY, true);
+        multi.add_remote_repository(repo, priority, enabled);
     }
 
     Ok(())

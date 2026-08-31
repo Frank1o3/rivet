@@ -1,7 +1,7 @@
 use rivet_core::Target;
 use rivet_package::{Dependency, DependencyKind, PackageManifest};
 use rivet_repository::{LocalRepository, MultiRepositoryManager};
-use rivet_resolver::{DependencySolver, ResolutionPlan};
+use rivet_resolver::{DependencySolver, PackageProvider, ResolutionPlan};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum InputMode {
@@ -56,7 +56,15 @@ impl App {
 
     pub fn reload_packages(&mut self) {
         let results = self.repos.search("");
-        let mut pkgs: Vec<PackageManifest> = results.into_iter().cloned().collect();
+        let mut pkgs: Vec<PackageManifest> = Vec::new();
+        for summary in results {
+            if let Ok(name) = rivet_core::PackageName::new(&summary.name) {
+                let candidates = self.repos.get_candidates(&name);
+                if let Some(first) = candidates.into_iter().next() {
+                    pkgs.push(first);
+                }
+            }
+        }
         pkgs.sort_by(|a, b| a.name.cmp(&b.name));
         self.all_packages = pkgs;
         self.apply_filter();

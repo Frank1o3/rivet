@@ -7,6 +7,6 @@ pub mod solver;
 
 // Re-export common types
 pub use error::{ResolverError, Result};
-pub use plan::{ResolutionPlan, ResolvedPackage};
+pub use plan::{ExecutionStage, ResolutionPlan, ResolvedPackage};
 pub use provider::{InMemoryPackageProvider, PackageProvider};
 pub use solver::DependencySolver;

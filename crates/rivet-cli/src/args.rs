@@ -53,6 +53,17 @@ pub enum Commands {
     Remove {
         /// Name of the package to remove
         package: String,
+
+        /// Force removal even if other installed packages depend on it
+        #[arg(short = 'f', long)]
+        force: bool,
+    },
+
+    /// Remove orphaned packages that were installed as dependencies but are no longer needed
+    Autoremove {
+        /// Preview orphaned packages without removing them
+        #[arg(short = 'd', long)]
+        dry_run: bool,
     },
 
     /// List all currently installed packages
@@ -88,8 +99,82 @@ pub enum Commands {
 
     /// Upgrade installed packages to newer versions found during the last update
     Upgrade {
+        /// Optional package name(s) to upgrade (if omitted, all eligible packages are checked)
+        #[arg()]
+        packages: Vec<String>,
+
         /// Preview available upgrades without making changes
         #[arg(short = 'd', long)]
         dry_run: bool,
+    },
+
+    /// Remove disposable cached downloads, sources, and build artifacts
+    Clean,
+
+    /// Verify file integrity and presence for installed packages
+    Verify {
+        /// Optional package name(s) to verify (verifies all installed packages if omitted)
+        #[arg()]
+        packages: Vec<String>,
+    },
+
+    /// Manage package repositories (list, add, remove, enable, disable)
+    Repo {
+        #[command(subcommand)]
+        command: RepoCommands,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum RepoCommands {
+    /// List all configured local and remote repositories
+    List,
+
+    /// Add a new remote repository definition
+    Add {
+        /// Repository identifier / slug (e.g. "community", "extra")
+        slug: String,
+
+        /// Remote Git repository URL
+        url: String,
+
+        /// Git branch to follow (defaults to "main")
+        #[arg(short, long)]
+        branch: Option<String>,
+
+        /// Subdirectory containing index.json and packages/
+        #[arg(short, long)]
+        path: Option<String>,
+
+        /// Repository priority (higher values take precedence, defaults to 10)
+        #[arg(short = 'P', long)]
+        priority: Option<i32>,
+
+        /// Human-readable display name (defaults to slug)
+        #[arg(short, long)]
+        name: Option<String>,
+
+        /// Repository description
+        #[arg(short, long)]
+        description: Option<String>,
+    },
+
+    /// Remove a configured repository definition
+    #[command(alias = "rm")]
+    Remove {
+        /// Repository slug to remove
+        slug: String,
+    },
+
+    /// Enable a disabled repository
+    Enable {
+        /// Repository slug to enable
+        slug: String,
+    },
+
+    /// Disable an active repository without removing its definition
+    Disable {
+        /// Repository slug to disable
+        slug: String,
     },
 }

@@ -168,6 +168,13 @@ fn render_inspector(f: &mut Frame, app: &App, area: Rect) {
             ]));
         }
 
+        if let Some(publ) = &pkg.publisher {
+            lines.push(Line::from(vec![
+                Span::styled("Publisher:    ", Style::default().fg(Color::Cyan)),
+                Span::raw(publ),
+            ]));
+        }
+
         if let Some(src) = &pkg.source {
             lines.push(Line::from(vec![
                 Span::styled("Source:       ", Style::default().fg(Color::Cyan)),

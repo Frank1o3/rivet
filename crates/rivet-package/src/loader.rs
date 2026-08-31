@@ -132,6 +132,7 @@ fn parse_package_table(table: &Table) -> std::result::Result<PackageManifest, St
     let description: Option<String> = table.get("description").ok();
     let license: Option<String> = table.get("license").ok();
     let homepage: Option<String> = table.get("homepage").ok();
+    let publisher: Option<String> = table.get("publisher").ok();
 
     // 4. Source
     let source = parse_source(table)?;
@@ -257,6 +258,7 @@ fn parse_package_table(table: &Table) -> std::result::Result<PackageManifest, St
         description,
         license,
         homepage,
+        publisher,
         source,
         dependencies,
         cleanup,
@@ -424,6 +426,26 @@ mod tests {
 
         assert_eq!(manifest.supported_architectures.len(), 2);
         assert_eq!(manifest.supported_os.len(), 2);
+    }
+
+    #[test]
+    fn test_load_package_with_publisher() {
+        let script = r#"
+            package({
+                name = "ripgrep",
+                version = "14.1.0",
+                publisher = "community-packager <packager@example.com>",
+            })
+        "#;
+
+        let loader = PackageLoader::new().unwrap();
+        let manifest = loader.load_from_str(script).unwrap();
+
+        assert_eq!(manifest.name.as_str(), "ripgrep");
+        assert_eq!(
+            manifest.publisher.as_deref(),
+            Some("community-packager <packager@example.com>")
+        );
     }
 
     #[test]

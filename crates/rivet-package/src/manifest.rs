@@ -16,6 +16,7 @@ pub struct PackageManifest {
     pub description: Option<String>,
     pub license: Option<String>,
     pub homepage: Option<String>,
+    pub publisher: Option<String>,
     pub source: Option<Source>,
     pub dependencies: Vec<Dependency>,
     pub features: HashMap<Feature, Vec<Dependency>>,

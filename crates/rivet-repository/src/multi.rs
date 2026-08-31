@@ -42,6 +42,10 @@ impl MultiRepositoryManager {
         }
     }
 
+    pub fn entries(&self) -> &[RepositoryEntry] {
+        &self.repositories
+    }
+
     pub fn add_local_repository(&mut self, repo: LocalRepository, priority: i32, enabled: bool) {
         self.insert(RepositoryBackend::Local(repo), priority, enabled);
     }
