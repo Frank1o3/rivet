@@ -6,6 +6,7 @@ pub mod loader;
 pub mod local;
 pub mod multi;
 pub mod remote;
+pub mod repo_helper;
 pub mod summary;
 
 pub use config::RepositoryConfig;
@@ -17,3 +18,5 @@ pub use local::LocalRepository;
 pub use multi::{MultiRepositoryManager, RemoteUpdateResult, RepositoryBackend, RepositoryEntry};
 pub use remote::{RemoteIndexChecksum, RemoteIndexEntry, RemoteRepository};
 pub use summary::PackageSummary;
+
+pub use repo_helper::load_repositories;

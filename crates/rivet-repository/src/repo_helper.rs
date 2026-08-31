@@ -1,8 +1,6 @@
 use std::path::Path;
 
-use rivet_repository::{
-    LocalRepository, MultiRepositoryManager, RemoteRepository, RepositoryLoader,
-};
+use crate::{LocalRepository, MultiRepositoryManager, RemoteRepository, RepositoryLoader};
 
 const LOCAL_REPO_PRIORITY: i32 = 1000;
 

@@ -2260,7 +2260,7 @@ dependencies = [
 
 [[package]]
 name = "rivet-cli"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -2276,7 +2276,7 @@ dependencies = [
 
 [[package]]
 name = "rivet-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "dirs",
@@ -2292,7 +2292,7 @@ dependencies = [
 
 [[package]]
 name = "rivet-package"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "bzip2",
  "dirs",
@@ -2312,8 +2312,9 @@ dependencies = [
 
 [[package]]
 name = "rivet-repository"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
+ "anyhow",
  "mlua",
  "rivet-core",
  "rivet-package",
@@ -2327,7 +2328,7 @@ dependencies = [
 
 [[package]]
 name = "rivet-resolver"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "rivet-core",
  "rivet-package",
@@ -2338,7 +2339,7 @@ dependencies = [
 
 [[package]]
 name = "rivet-tui"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "crossterm",

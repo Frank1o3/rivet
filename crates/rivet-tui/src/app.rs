@@ -1,12 +1,22 @@
+use std::path::{Path, PathBuf};
+
 use rivet_core::Target;
 use rivet_package::{Dependency, DependencyKind, PackageManifest};
-use rivet_repository::{LocalRepository, MultiRepositoryManager};
+use rivet_repository::MultiRepositoryManager;
 use rivet_resolver::{DependencySolver, PackageProvider, ResolutionPlan};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum InputMode {
     Normal,
     Search,
+}
+
+fn explicit_repo_path() -> Option<PathBuf> {
+    ["packages", "recipes"]
+        .iter()
+        .map(Path::new)
+        .find(|dir| dir.exists())
+        .map(|dir| dir.to_path_buf())
 }
 
 pub struct App {
@@ -24,16 +34,8 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
-        let mut repos = MultiRepositoryManager::new();
-        // Check standard locations
-        for dir in &["packages", "recipes", "."] {
-            if std::path::Path::new(dir).exists() {
-                let mut r = LocalRepository::open(dir, "local");
-                let _ = r.scan_and_index();
-                repos.add_local_repository(r, 10, true);
-                break;
-            }
-        }
+        let repos = rivet_repository::load_repositories(explicit_repo_path().as_deref())
+            .unwrap_or_default();
 
         let mut app = Self {
             repos,

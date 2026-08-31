@@ -1,9 +1,9 @@
 mod args;
 mod commands;
-mod repo_helper;
 
 use clap::Parser;
 use rivet_core::InstalledDatabase;
+use rivet_repository::load_repositories;
 
 fn main() -> anyhow::Result<()> {
     let cli = args::Cli::parse();
@@ -17,7 +17,7 @@ fn main() -> anyhow::Result<()> {
             dry_run,
             feature,
         } => {
-            let repos = repo_helper::load_repositories(cli.repo.as_deref())?;
+            let repos = load_repositories(cli.repo.as_deref())?;
 
             let scope = if cli.system {
                 rivet_core::InstallScope::System
@@ -45,11 +45,11 @@ fn main() -> anyhow::Result<()> {
             )?;
         }
         args::Commands::Search { query } => {
-            let repos = repo_helper::load_repositories(cli.repo.as_deref())?;
+            let repos = load_repositories(cli.repo.as_deref())?;
             commands::search::execute(&repos, &query)?;
         }
         args::Commands::Info { package } => {
-            let repos = repo_helper::load_repositories(cli.repo.as_deref())?;
+            let repos = load_repositories(cli.repo.as_deref())?;
 
             let scope = if cli.system {
                 rivet_core::InstallScope::System
@@ -65,7 +65,7 @@ fn main() -> anyhow::Result<()> {
             commands::info::execute(&repos, &db, &package)?;
         }
         args::Commands::Sync => {
-            let mut repos = repo_helper::load_repositories(cli.repo.as_deref())?;
+            let mut repos = load_repositories(cli.repo.as_deref())?;
             commands::sync::execute(&mut repos)?;
         }
         args::Commands::Build { recipe, check_only } => {
@@ -131,7 +131,7 @@ fn main() -> anyhow::Result<()> {
             commands::list::execute(&db)?;
         }
         args::Commands::Update => {
-            let mut repos = repo_helper::load_repositories(cli.repo.as_deref())?;
+            let mut repos = load_repositories(cli.repo.as_deref())?;
 
             let scope = if cli.system {
                 rivet_core::InstallScope::System
@@ -147,7 +147,7 @@ fn main() -> anyhow::Result<()> {
             commands::update::execute(&mut repos, &db)?;
         }
         args::Commands::Upgrade { packages, dry_run } => {
-            let repos = repo_helper::load_repositories(cli.repo.as_deref())?;
+            let repos = load_repositories(cli.repo.as_deref())?;
 
             let scope = if cli.system {
                 rivet_core::InstallScope::System
@@ -170,14 +170,7 @@ fn main() -> anyhow::Result<()> {
             };
 
             let mut db = InstalledDatabase::open(db_path)?;
-            commands::upgrade::execute(
-                &repos,
-                &packages,
-                &mut db,
-                &prefix,
-                &cache_dir,
-                dry_run,
-            )?;
+            commands::upgrade::execute(&repos, &packages, &mut db, &prefix, &cache_dir, dry_run)?;
         }
         args::Commands::Clean => {
             let cache_dir = match cli.cache {
