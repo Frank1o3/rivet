@@ -55,12 +55,12 @@ pub fn execute() -> anyhow::Result<()> {
 }
 
 /// Derives the curated `rivet-repo` URL from this crate's own
-/// `repository` field, by convention (`.../rivet.git` -> `.../rivet-repo.git`),
+/// `repository` field, by convention (`.../rivet.git` -> `.../rivet-repository.git`),
 /// instead of hardcoding the org/user name a second time.
 fn default_repo_source_url() -> Option<String> {
     OWN_REPO_URL
         .strip_suffix("/rivet.git")
-        .map(|base| format!("{base}/rivet-repo.git"))
+        .map(|base| format!("{base}/rivet-repository.git"))
 }
 
 fn default_repository_lua(url: &str) -> String {
@@ -86,11 +86,14 @@ mod tests {
 
     #[test]
     fn test_default_repository_lua_parses() {
-        let contents = default_repository_lua("https://github.com/Frank1o3/rivet-repo.git");
+        let contents = default_repository_lua("https://github.com/Frank1o3/rivet-repository.git");
         let loader = RepositoryLoader::new().unwrap();
         let def = loader.load_from_str(&contents).unwrap();
         assert_eq!(def.name, "Rivet");
-        assert_eq!(def.source.url, "https://github.com/Frank1o3/rivet-repo.git");
+        assert_eq!(
+            def.source.url,
+            "https://github.com/Frank1o3/rivet-repository.git"
+        );
         assert_eq!(def.source.path.as_deref(), Some("src"));
     }
 
@@ -102,10 +105,10 @@ mod tests {
         let own = "https://github.com/Frank1o3/rivet.git";
         let derived = own
             .strip_suffix("/rivet.git")
-            .map(|base| format!("{base}/rivet-repo.git"));
+            .map(|base| format!("{base}/rivet-repository.git"));
         assert_eq!(
             derived.as_deref(),
-            Some("https://github.com/Frank1o3/rivet-repo.git")
+            Some("https://github.com/Frank1o3/rivet-repository.git")
         );
     }
 }

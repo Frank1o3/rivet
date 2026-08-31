@@ -117,7 +117,7 @@ mod tests {
                 license = "MIT",
 
                 source = {
-                    url = "https://github.com/example/rivet-repo.git",
+                    url = "https://github.com/example/rivet-repository.git",
                     branch = "stable",
                 },
             })
@@ -128,7 +128,10 @@ mod tests {
 
         assert_eq!(def.name, "Rivet");
         assert_eq!(def.license.as_deref(), Some("MIT"));
-        assert_eq!(def.source.url, "https://github.com/example/rivet-repo.git");
+        assert_eq!(
+            def.source.url,
+            "https://github.com/example/rivet-repository.git"
+        );
         assert_eq!(def.source.branch, "stable");
         assert_eq!(def.priority, 10);
         assert!(def.enabled);
@@ -194,7 +197,7 @@ mod tests {
             repository({
                 name = "rivet",
                 source = {
-                    url = "https://github.com/Frank1o3/rivet-repo.git",
+                    url = "https://github.com/Frank1o3/rivet-repository.git",
                     branch = "stable",
                     path = "src",
                 },
