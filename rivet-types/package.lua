@@ -169,6 +169,7 @@ function BuildContext:chmod(path, mode) end
 ---@field source RivetSource?
 ---@field dependencies string[]?
 ---@field build_dependencies string[]?
+---@field cleanup string[]? # Build-time dependencies to remove after the build phase completes. Must be a subset of build_dependencies.
 ---@field features table<string, boolean|string[]>?
 ---@field architectures string[]? # CPU targets only: x86_64, aarch64, riscv64, armv7 — NOT things like wayland/x11
 ---@field os string[]? # linux, macos, windows, veyra, ...
