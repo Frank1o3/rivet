@@ -1,12 +1,51 @@
-use rivet_core::PackageName;
+use rivet_core::{InstalledDatabase, PackageName};
 use rivet_repository::MultiRepositoryManager;
 use rivet_resolver::PackageProvider;
 
-pub fn execute(repos: &MultiRepositoryManager, package_name_str: &str) -> anyhow::Result<()> {
+pub fn execute(
+    repos: &MultiRepositoryManager,
+    db: &InstalledDatabase,
+    package_name_str: &str,
+) -> anyhow::Result<()> {
     let name = PackageName::new(package_name_str)?;
     let candidates = repos.get_candidates(&name);
 
     if candidates.is_empty() {
+        if let Some(record) = db.get(&name) {
+            println!("Package:      {}", record.name);
+            println!("Version:      {} (installed)", record.version);
+            if let Some(desc) = &record.description {
+                println!("Description:  {}", desc);
+            }
+            println!(
+                "Installed:    {} file(s), {}",
+                record.installed_files.len(),
+                if record.is_explicit {
+                    "explicit"
+                } else {
+                    "dependency"
+                }
+            );
+            if let Some(source) = &record.source_repository {
+                println!("Source repo:  {}", source);
+            }
+
+            println!();
+            println!(
+                "⚠️  '{}' is no longer listed in any currently configured repository{}.",
+                record.name,
+                record
+                    .source_repository
+                    .as_deref()
+                    .map(|s| format!(" (originally installed from '{}')", s))
+                    .unwrap_or_default()
+            );
+            println!(
+                "    It may have been removed, replaced, or deprecated upstream — worth investigating why."
+            );
+            return Ok(());
+        }
+
         println!(
             "Package '{}' not found in available repositories.",
             package_name_str

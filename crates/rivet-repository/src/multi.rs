@@ -140,6 +140,20 @@ impl MultiRepositoryManager {
 
         results
     }
+
+    pub fn repository_still_provides(&self, repo_slug: &str, name: &PackageName) -> Option<bool> {
+        for entry in &self.repositories {
+            if !entry.enabled {
+                continue;
+            }
+            if let RepositoryBackend::Remote(repo) = &entry.backend {
+                if repo.slug == repo_slug {
+                    return Some(!repo.get_candidates(name).is_empty());
+                }
+            }
+        }
+        None
+    }
 }
 
 impl PackageProvider for MultiRepositoryManager {

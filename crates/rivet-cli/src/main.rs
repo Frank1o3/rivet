@@ -50,7 +50,19 @@ fn main() -> anyhow::Result<()> {
         }
         args::Commands::Info { package } => {
             let repos = repo_helper::load_repositories(cli.repo.as_deref())?;
-            commands::info::execute(&repos, &package)?;
+
+            let scope = if cli.system {
+                rivet_core::InstallScope::System
+            } else {
+                rivet_core::InstallScope::User
+            };
+            let db_path = match cli.db {
+                Some(path) => rivet_core::absolute_path(path)?,
+                None => scope.default_db_path()?,
+            };
+            let db = InstalledDatabase::open(db_path)?;
+
+            commands::info::execute(&repos, &db, &package)?;
         }
         args::Commands::Sync => {
             let mut repos = repo_helper::load_repositories(cli.repo.as_deref())?;
@@ -97,7 +109,19 @@ fn main() -> anyhow::Result<()> {
         }
         args::Commands::Update => {
             let mut repos = repo_helper::load_repositories(cli.repo.as_deref())?;
-            commands::update::execute(&mut repos)?;
+
+            let scope = if cli.system {
+                rivet_core::InstallScope::System
+            } else {
+                rivet_core::InstallScope::User
+            };
+            let db_path = match cli.db {
+                Some(path) => rivet_core::absolute_path(path)?,
+                None => scope.default_db_path()?,
+            };
+            let db = InstalledDatabase::open(db_path)?;
+
+            commands::update::execute(&mut repos, &db)?;
         }
         args::Commands::Upgrade { dry_run } => {
             let repos = repo_helper::load_repositories(cli.repo.as_deref())?;
