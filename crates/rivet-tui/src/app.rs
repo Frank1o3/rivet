@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use rivet_core::Target;
+use rivet_core::{InstalledDatabase, Target};
 use rivet_package::{Dependency, DependencyKind, PackageManifest};
 use rivet_repository::MultiRepositoryManager;
 use rivet_resolver::{DependencySolver, PackageProvider, ResolutionPlan};
@@ -118,10 +118,43 @@ impl App {
     }
 
     pub fn sync_repositories(&mut self) {
-        match self.repos.scan_all() {
-            Ok(count) => {
+        let remote_results = self.repos.update_remotes();
+        let scan_result = self.repos.scan_all();
+
+        let had_remote_failure = remote_results.iter().any(|r| r.outcome.is_err());
+
+        match scan_result {
+            Ok(local_total) => {
                 self.reload_packages();
-                self.status_message = format!("Indexed {} packages successfully.", count);
+
+                if remote_results.is_empty() {
+                    self.status_message = format!(
+                        "Synced {} package(s) (no remote repositories configured).",
+                        local_total
+                    );
+                } else if had_remote_failure {
+                    let failed: Vec<String> = remote_results
+                        .iter()
+                        .filter_map(|r| {
+                            r.outcome
+                                .as_ref()
+                                .err()
+                                .map(|e| format!("{}: {}", r.slug, e))
+                        })
+                        .collect();
+                    self.status_message = format!(
+                        "Synced {} package(s), but {} remote repo(s) failed: {}",
+                        local_total,
+                        failed.len(),
+                        failed.join("; ")
+                    );
+                } else {
+                    self.status_message = format!(
+                        "Synced {} package(s) across {} remote repo(s).",
+                        local_total,
+                        remote_results.len()
+                    );
+                }
             }
             Err(e) => {
                 self.status_message = format!("Sync failed: {}", e);
@@ -154,10 +187,109 @@ impl App {
             }
         }
     }
+
+    pub fn confirm_resolution_plan(&mut self) {
+        self.show_modal = false;
+
+        let Some(plan) = self.resolution_plan.take() else {
+            self.status_message = "No resolution plan available.".to_string();
+            return;
+        };
+
+        if plan.is_empty() {
+            self.status_message = "Nothing to install.".to_string();
+            return;
+        }
+
+        let root_name = self.selected_package().map(|pkg| pkg.name.clone());
+        let scope = rivet_core::InstallScope::User;
+        let db_path = match scope.default_db_path() {
+            Ok(path) => path,
+            Err(err) => {
+                self.status_message = format!("Install setup failed: {}", err);
+                return;
+            }
+        };
+        let prefix = match scope.default_prefix() {
+            Ok(path) => path,
+            Err(err) => {
+                self.status_message = format!("Install setup failed: {}", err);
+                return;
+            }
+        };
+        let cache_dir = match rivet_core::default_source_cache() {
+            Ok(path) => path,
+            Err(err) => {
+                self.status_message = format!("Install setup failed: {}", err);
+                return;
+            }
+        };
+
+        let mut db = match InstalledDatabase::open(&db_path) {
+            Ok(db) => db,
+            Err(err) => {
+                self.status_message = format!("Could not open install database: {}", err);
+                return;
+            }
+        };
+
+        let mut installed_count = 0usize;
+
+        for item in plan {
+            if db.is_installed(&item.manifest.name) {
+                continue;
+            }
+            if item.is_system_provided {
+                continue;
+            }
+
+            let is_explicit = root_name
+                .as_ref()
+                .is_some_and(|root| item.manifest.name == *root);
+
+            match rivet_package::install(&item.manifest, &prefix, &cache_dir, &mut db, is_explicit)
+            {
+                Ok(_) => {
+                    installed_count += 1;
+                }
+                Err(err) => {
+                    self.status_message = format!("Install failed: {}", err);
+                    return;
+                }
+            }
+        }
+
+        if installed_count == 0 {
+            self.status_message = "Nothing to install.".to_string();
+        } else {
+            self.status_message = format!("Installed {} package(s).", installed_count);
+        }
+    }
 }
 
 impl Default for App {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn modal_enter_confirms_resolution_and_closes_modal() {
+        let mut app = App::new();
+        app.show_modal = true;
+        app.resolution_plan = Some(ResolutionPlan::default());
+
+        app.confirm_resolution_plan();
+
+        assert!(!app.show_modal);
+        assert!(app.resolution_plan.is_none());
+        assert!(
+            app.status_message.contains("Nothing to install")
+                || app.status_message.contains("Resolved")
+        );
     }
 }

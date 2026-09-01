@@ -58,8 +58,12 @@ fn run_app(
                 if key.kind == KeyEventKind::Press {
                     if app.show_modal {
                         match key.code {
-                            KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q') => {
+                            KeyCode::Enter => {
+                                app.confirm_resolution_plan();
+                            }
+                            KeyCode::Esc | KeyCode::Char('q') => {
                                 app.show_modal = false;
+                                app.status_message = "Resolution plan dismissed.".to_string();
                             }
                             _ => {}
                         }
