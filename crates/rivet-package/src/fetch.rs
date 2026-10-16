@@ -4,7 +4,7 @@
 //! Archive sources are downloaded, verified, and extracted into the package cache.
 
 use std::fs::{self, File};
-use std::io::{self, Read};
+use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -95,7 +95,8 @@ pub fn fetch_archive(url: &str, checksum: &Checksum, cache_dir: &Path) -> Result
 
     let response = reqwest::blocking::Client::builder()
         .redirect(reqwest::redirect::Policy::limited(10))
-        .timeout(None)
+        .connect_timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(15 * 60))
         .build()
         .map_err(|e| PackageError::SourceFetch(format!("failed to create HTTP client: {e}")))?
         .get(url)
@@ -110,19 +111,29 @@ pub fn fetch_archive(url: &str, checksum: &Checksum, cache_dir: &Path) -> Result
         )));
     }
 
-    let bytes = response.bytes().map_err(|e| {
-        eprintln!("Reqwest error: {e}");
-        eprintln!("Debug: {e:?}");
-
+    // Stream large source archives to disk instead of buffering the entire
+    // download in memory. Keep the temporary file beside the final archive so
+    // persisting it is an atomic rename on the same filesystem.
+    let mut downloaded = tempfile::NamedTempFile::new_in(&archive_dir).map_err(PackageError::Io)?;
+    let mut response = response;
+    io::copy(&mut response, downloaded.as_file_mut()).map_err(|e| {
         PackageError::SourceFetch(format!("failed to read downloaded archive '{}': {e}", url))
     })?;
 
-    checksum.verify(&bytes).map_err(|e| {
-        PackageError::SourceFetch(format!("checksum verification failed for '{}': {e}", url))
-    })?;
+    downloaded
+        .as_file_mut()
+        .seek(SeekFrom::Start(0))
+        .map_err(PackageError::Io)?;
+    checksum
+        .verify_reader(downloaded.as_file_mut())
+        .map_err(|e| {
+            PackageError::SourceFetch(format!("checksum verification failed for '{}': {e}", url))
+        })?;
 
-    // Write only after checksum verification succeeds.
-    fs::write(&archive_path, &bytes).map_err(PackageError::Io)?;
+    // Publish the archive only after checksum verification succeeds.
+    downloaded
+        .persist(&archive_path)
+        .map_err(|e| PackageError::Io(e.error))?;
 
     if extract_dir.exists() {
         fs::remove_dir_all(&extract_dir).map_err(PackageError::Io)?;
@@ -216,7 +227,10 @@ fn extract_zip(archive_path: &Path, output_dir: &Path) -> Result<()> {
             PackageError::SourceFetch(format!("failed to read zip entry {index}: {e}"))
         })?;
 
-        let raw_name = entry.name().to_string();
+        let raw_name = entry
+            .name()
+            .map_err(|e| PackageError::SourceFetch(format!("failed to read zip entry name: {e}")))?
+            .into_owned();
         let entry_path = Path::new(&raw_name);
 
         validate_archive_path(entry_path)?;

@@ -1,4 +1,5 @@
 use std::fmt;
+use std::io::Read;
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
@@ -72,12 +73,44 @@ impl Checksum {
         }
     }
 
+    /// Verifies a checksum from a reader without loading the full input into memory.
+    pub fn verify_reader<R: Read>(&self, reader: &mut R) -> Result<()> {
+        let actual = match self {
+            Checksum::Sha256(_) => Checksum::Sha256(hash_reader::<Sha256Hasher, _>(reader)?),
+            Checksum::Sha512(_) => Checksum::Sha512(hash_reader::<Sha512Hasher, _>(reader)?),
+        };
+
+        if self == &actual {
+            Ok(())
+        } else {
+            Err(CoreError::ChecksumMismatch {
+                expected: self.hex_value().to_string(),
+                actual: actual.hex_value().to_string(),
+            })
+        }
+    }
+
     /// Returns the raw hexadecimal string of the checksum.
     pub fn hex_value(&self) -> &str {
         match self {
             Checksum::Sha256(h) | Checksum::Sha512(h) => h.as_str(),
         }
     }
+}
+
+fn hash_reader<D: Digest + Default, R: Read>(reader: &mut R) -> std::io::Result<String> {
+    let mut hasher = D::default();
+    let mut buffer = [0_u8; 64 * 1024];
+
+    loop {
+        let count = reader.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+    }
+
+    Ok(hex::encode(hasher.finalize()))
 }
 
 impl fmt::Display for Checksum {
