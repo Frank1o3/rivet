@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -130,6 +131,28 @@ impl InstalledDatabase {
         self.packages.get(name)
     }
 
+    /// Returns the package record that currently claims an installed file path.
+    pub fn file_owner(&self, path: &Path) -> Option<&InstalledRecord> {
+        self.packages
+            .values()
+            .find(|record| record.installed_files.iter().any(|file| file == path))
+    }
+
+    /// Rejects paths already recorded as owned by a different package.
+    pub fn check_file_conflicts(&self, name: &PackageName, files: &[PathBuf]) -> Result<()> {
+        for file in files {
+            if let Some(owner) = self.file_owner(file) {
+                if &owner.name != name {
+                    return Err(crate::error::CoreError::FileConflict {
+                        path: file.display().to_string(),
+                        owner: owner.name.to_string(),
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Lists all installed package records.
     pub fn list_installed(&self) -> Vec<&InstalledRecord> {
         let mut list: Vec<&InstalledRecord> = self.packages.values().collect();
@@ -139,23 +162,88 @@ impl InstalledDatabase {
 
     /// Records or updates an installed package entry and saves to disk.
     pub fn record_install(&mut self, record: InstalledRecord) -> Result<()> {
-        self.packages.insert(record.name.clone(), record);
-        self.save()
+        self.check_file_conflicts(&record.name, &record.installed_files)?;
+
+        let name = record.name.clone();
+        let previous = self.packages.insert(name.clone(), record);
+        if let Err(error) = self.save() {
+            if let Some(previous) = previous {
+                self.packages.insert(name, previous);
+            } else {
+                self.packages.remove(&name);
+            }
+            return Err(error);
+        }
+        Ok(())
     }
 
-    /// Removes an installed package entry and deletes its tracked files from disk.
+    /// Removes a package and its files as a rollback-capable database transaction.
     pub fn remove_package(&mut self, name: &PackageName) -> Result<Option<InstalledRecord>> {
-        if let Some(record) = self.packages.remove(name) {
-            for file_path in &record.installed_files {
-                if file_path.is_symlink() || file_path.is_file() || file_path.exists() {
-                    let _ = fs::remove_file(file_path);
+        let Some(record) = self.packages.get(name).cloned() else {
+            return Ok(None);
+        };
+
+        // Move files aside first. Each quarantine directory is on the same
+        // filesystem as its file, so a rename is atomic even when the package
+        // database and installation prefix are on different filesystems.
+        let mut quarantines = Vec::new();
+        let mut moved_files = Vec::new();
+        for file_path in &record.installed_files {
+            let shared = self.packages.iter().any(|(other_name, other)| {
+                other_name != name && other.installed_files.iter().any(|file| file == file_path)
+            });
+            if shared {
+                continue;
+            }
+
+            match fs::symlink_metadata(file_path) {
+                Ok(_) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(error) => {
+                    rollback_file_moves(&moved_files, quarantines)?;
+                    return Err(error.into());
                 }
             }
-            self.save()?;
-            Ok(Some(record))
-        } else {
-            Ok(None)
+
+            let Some(parent) = file_path
+                .parent()
+                .filter(|parent| !parent.as_os_str().is_empty())
+            else {
+                continue;
+            };
+            let Some(filename) = file_path.file_name() else {
+                continue;
+            };
+            let quarantine = match tempfile::Builder::new()
+                .prefix(".rivet-remove-")
+                .tempdir_in(parent)
+            {
+                Ok(quarantine) => quarantine,
+                Err(error) => {
+                    rollback_file_moves(&moved_files, quarantines)?;
+                    return Err(error.into());
+                }
+            };
+            let backup_path = quarantine.path().join(filename);
+            if let Err(error) = fs::rename(file_path, &backup_path) {
+                rollback_file_moves(&moved_files, quarantines)?;
+                return Err(error.into());
+            }
+            moved_files.push((backup_path, file_path.clone()));
+            quarantines.push(quarantine);
         }
+
+        self.packages.remove(name);
+        if let Err(error) = self.save() {
+            self.packages.insert(name.clone(), record.clone());
+            rollback_file_moves(&moved_files, quarantines)?;
+            return Err(error);
+        }
+
+        // Dropping the quarantine directories now permanently removes the
+        // package files after the database no longer advertises ownership.
+        drop(quarantines);
+        Ok(Some(record))
     }
 
     /// Returns all installed packages that declare a runtime dependency on the given package.
@@ -225,14 +313,40 @@ impl InstalledDatabase {
 
     /// Saves the database to disk.
     pub fn save(&self) -> Result<()> {
-        if let Some(parent) = self.db_path.parent() {
-            fs::create_dir_all(parent)?;
-        }
+        let parent = self
+            .db_path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        fs::create_dir_all(parent)?;
         let json = serde_json::to_string_pretty(self)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        fs::write(&self.db_path, json)?;
+        let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
+        temporary.write_all(json.as_bytes())?;
+        temporary.as_file().sync_all()?;
+        temporary
+            .persist(&self.db_path)
+            .map_err(|error| error.error)?;
         Ok(())
     }
+}
+
+fn rollback_file_moves(
+    moved_files: &[(PathBuf, PathBuf)],
+    quarantines: Vec<tempfile::TempDir>,
+) -> std::io::Result<()> {
+    for (backup, original) in moved_files.iter().rev() {
+        if backup.exists() || backup.is_symlink() {
+            if let Err(error) = fs::rename(backup, original) {
+                for quarantine in quarantines {
+                    let _ = quarantine.keep();
+                }
+                return Err(error);
+            }
+        }
+    }
+    drop(quarantines);
+    Ok(())
 }
 
 #[cfg(test)]

@@ -19,6 +19,9 @@ pub enum CoreError {
     #[error("checksum mismatch: expected {expected}, calculated {actual}")]
     ChecksumMismatch { expected: String, actual: String },
 
+    #[error("file '{}' is already owned by package '{}'", path, owner)]
+    FileConflict { path: String, owner: String },
+
     #[error("invalid feature name '{0}': {1}")]
     InvalidFeature(String, &'static str),
 

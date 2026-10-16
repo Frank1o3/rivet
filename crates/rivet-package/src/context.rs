@@ -1,7 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::{Arc, Mutex};
 
 use mlua::{Table, UserData, UserDataMethods};
 
@@ -13,6 +14,9 @@ pub struct BuildContext {
     pub dest_dir: PathBuf,
     pub prefix: PathBuf,
     pub env_vars: HashMap<String, String>,
+    package_name: Option<String>,
+    file_owners: HashMap<PathBuf, String>,
+    written_files: Arc<Mutex<HashSet<PathBuf>>>,
 }
 
 impl BuildContext {
@@ -28,7 +32,87 @@ impl BuildContext {
             dest_dir: dest_dir.as_ref().to_path_buf(),
             prefix: prefix.as_ref().to_path_buf(),
             env_vars: HashMap::new(),
+            package_name: None,
+            file_owners: HashMap::new(),
+            written_files: Arc::new(Mutex::new(HashSet::new())),
         }
+    }
+
+    /// Configures file ownership checks and tracking for recipe filesystem helpers.
+    pub fn with_file_ownership(
+        mut self,
+        package_name: impl Into<String>,
+        file_owners: HashMap<PathBuf, String>,
+    ) -> Self {
+        self.package_name = Some(package_name.into());
+        self.file_owners = file_owners;
+        self
+    }
+
+    fn check_write_path(&self, path: &Path) -> mlua::Result<()> {
+        if let Some(package) = self.package_name.as_deref() {
+            if let Some(owner) = self.file_owners.get(path) {
+                if package != owner {
+                    return Err(mlua::Error::runtime(format!(
+                        "cannot modify '{}': it is owned by package '{}'",
+                        path.display(),
+                        owner
+                    )));
+                }
+            } else if path.starts_with(&self.prefix)
+                && !self.path_was_written(path)
+                && fs::symlink_metadata(path).is_ok()
+            {
+                return Err(mlua::Error::runtime(format!(
+                    "cannot overwrite unmanaged file '{}'",
+                    path.display()
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    fn path_was_written(&self, path: &Path) -> bool {
+        self.written_files
+            .lock()
+            .map(|paths| paths.contains(path))
+            .unwrap_or(false)
+    }
+
+    fn record_written_path(&self, path: &Path) -> mlua::Result<()> {
+        self.written_files
+            .lock()
+            .map_err(|_| mlua::Error::runtime("file tracking lock was poisoned"))?
+            .insert(path.to_path_buf());
+        Ok(())
+    }
+
+    /// Paths modified through the recipe filesystem helpers.
+    pub fn written_paths(&self) -> Vec<PathBuf> {
+        self.written_files
+            .lock()
+            .map(|paths| paths.iter().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    /// Removes newly created files recorded by this context during rollback.
+    pub fn rollback_new_writes(&self) -> std::io::Result<()> {
+        for path in self.written_paths() {
+            if self.file_owners.contains_key(&path) {
+                continue;
+            }
+            match fs::symlink_metadata(&path) {
+                Ok(metadata)
+                    if metadata.file_type().is_file() || metadata.file_type().is_symlink() =>
+                {
+                    fs::remove_file(path)?;
+                }
+                Ok(_) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(())
     }
 }
 
@@ -189,15 +273,17 @@ impl UserData for BuildContext {
         // Filesystem manipulation
         // ---------------------------------------------------------------------
 
-        methods.add_method("copy", |_, _, (src, dst): (String, String)| {
+        methods.add_method("copy", |_, this, (src, dst): (String, String)| {
             let src_path = Path::new(&src);
             let dst_path = Path::new(&dst);
+            this.check_write_path(dst_path)?;
 
             if let Some(parent) = dst_path.parent() {
                 fs::create_dir_all(parent).map_err(|e| mlua::Error::runtime(e.to_string()))?;
             }
 
             fs::copy(src_path, dst_path).map_err(|e| mlua::Error::runtime(e.to_string()))?;
+            this.record_written_path(dst_path)?;
 
             Ok(())
         });
@@ -208,15 +294,19 @@ impl UserData for BuildContext {
             Ok(())
         });
 
-        methods.add_method("rename", |_, _, (src, dst): (String, String)| {
+        methods.add_method("rename", |_, this, (src, dst): (String, String)| {
             let src_path = Path::new(&src);
             let dst_path = Path::new(&dst);
+            this.check_write_path(src_path)?;
+            this.check_write_path(dst_path)?;
 
             if let Some(parent) = dst_path.parent() {
                 fs::create_dir_all(parent).map_err(|e| mlua::Error::runtime(e.to_string()))?;
             }
 
             fs::rename(src_path, dst_path).map_err(|e| mlua::Error::runtime(e.to_string()))?;
+            this.record_written_path(src_path)?;
+            this.record_written_path(dst_path)?;
 
             Ok(())
         });
@@ -225,20 +315,28 @@ impl UserData for BuildContext {
             fs::read_to_string(&path).map_err(|e| mlua::Error::runtime(e.to_string()))
         });
 
-        methods.add_method("write_file", |_, _, (path, contents): (String, String)| {
+        methods.add_method(
+            "write_file",
+            |_, this, (path, contents): (String, String)| {
+                let path = Path::new(&path);
+                this.check_write_path(path)?;
+
+                if let Some(parent) = path.parent() {
+                    fs::create_dir_all(parent).map_err(|e| mlua::Error::runtime(e.to_string()))?;
+                }
+
+                fs::write(path, contents).map_err(|e| mlua::Error::runtime(e.to_string()))?;
+                this.record_written_path(path)?;
+
+                Ok(())
+            },
+        );
+
+        methods.add_method("remove_file", |_, this, path: String| {
             let path = Path::new(&path);
-
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent).map_err(|e| mlua::Error::runtime(e.to_string()))?;
-            }
-
-            fs::write(path, contents).map_err(|e| mlua::Error::runtime(e.to_string()))?;
-
-            Ok(())
-        });
-
-        methods.add_method("remove_file", |_, _, path: String| {
-            fs::remove_file(&path).map_err(|e| mlua::Error::runtime(e.to_string()))?;
+            this.check_write_path(path)?;
+            fs::remove_file(path).map_err(|e| mlua::Error::runtime(e.to_string()))?;
+            this.record_written_path(path)?;
 
             Ok(())
         });
@@ -257,9 +355,10 @@ impl UserData for BuildContext {
         // Symbolic links
         // ---------------------------------------------------------------------
 
-        methods.add_method("symlink", |_, _, (target, link): (String, String)| {
+        methods.add_method("symlink", |_, this, (target, link): (String, String)| {
             let target_path = Path::new(&target);
             let link_path = Path::new(&link);
+            this.check_write_path(link_path)?;
 
             if let Some(parent) = link_path.parent() {
                 fs::create_dir_all(parent).map_err(|e| mlua::Error::runtime(e.to_string()))?;
@@ -282,11 +381,14 @@ impl UserData for BuildContext {
                 }
             }
 
+            this.record_written_path(link_path)?;
+
             Ok(())
         });
 
-        methods.add_method("remove_symlink", |_, _, path: String| {
+        methods.add_method("remove_symlink", |_, this, path: String| {
             let path = Path::new(&path);
+            this.check_write_path(path)?;
 
             let metadata =
                 fs::symlink_metadata(path).map_err(|e| mlua::Error::runtime(e.to_string()))?;
@@ -299,6 +401,7 @@ impl UserData for BuildContext {
             }
 
             fs::remove_file(path).map_err(|e| mlua::Error::runtime(e.to_string()))?;
+            this.record_written_path(path)?;
 
             Ok(())
         });
@@ -307,7 +410,8 @@ impl UserData for BuildContext {
         // File permissions
         // ---------------------------------------------------------------------
 
-        methods.add_method("chmod", |_, _, (path, mode): (String, String)| {
+        methods.add_method("chmod", |_, this, (path, mode): (String, String)| {
+            this.check_write_path(Path::new(&path))?;
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
@@ -322,6 +426,7 @@ impl UserData for BuildContext {
 
                 fs::set_permissions(&path, permissions)
                     .map_err(|e| mlua::Error::runtime(e.to_string()))?;
+                this.record_written_path(Path::new(&path))?;
 
                 Ok(())
             }

@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -30,19 +31,92 @@ pub fn install(
 
     let source_dir = resolve_source(manifest, cache_dir)?;
     let build_dir = tempfile::tempdir().map_err(PackageError::Io)?;
+    fs::create_dir_all(cache_dir).map_err(PackageError::Io)?;
+    let staged_package = tempfile::tempdir_in(cache_dir).map_err(PackageError::Io)?;
+    let staged_dir = staged_package.path().to_path_buf();
     let dest_dir = cache_dir.join(format!("{}-{}", manifest.name, manifest.version));
-    fs::create_dir_all(&dest_dir).map_err(PackageError::Io)?;
 
-    let ctx = BuildContext::new(&source_dir, build_dir.path(), &dest_dir, prefix);
+    let file_owners: HashMap<_, _> = db
+        .list_installed()
+        .into_iter()
+        .flat_map(|record| {
+            record
+                .installed_files
+                .iter()
+                .map(move |path| (path.clone(), record.name.to_string()))
+        })
+        .collect();
+    let ctx = BuildContext::new(&source_dir, build_dir.path(), &staged_dir, prefix)
+        .with_file_ownership(manifest.name.to_string(), file_owners);
 
     let loader = PackageLoader::new()?;
-    loader.run_hooks(
-        &script,
-        &ctx,
-        &["pre_install", "build", "install", "post_install"],
-    )?;
+    if let Err(error) = loader.run_hooks(&script, &ctx, &["pre_install", "build", "install"]) {
+        ctx.rollback_new_writes().map_err(PackageError::Io)?;
+        return Err(error.into());
+    }
 
-    let installed_files = collect_installed_files(&dest_dir);
+    // Preserve a same-version install until the new hooks have succeeded.
+    // The staging directory is inside the cache, so both renames stay on one
+    // filesystem and the active artifact is switched as a single operation.
+    let backup = match fs::symlink_metadata(&dest_dir) {
+        Ok(_) => {
+            let backup_dir = tempfile::tempdir_in(cache_dir).map_err(PackageError::Io)?;
+            let backup_path = backup_dir.path().join("previous");
+            if let Err(error) = fs::rename(&dest_dir, &backup_path) {
+                return Err(PackageError::Io(error));
+            }
+            Some((backup_dir, backup_path))
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => return Err(PackageError::Io(error)),
+    };
+
+    if let Err(error) = fs::rename(&staged_dir, &dest_dir) {
+        if let Some((backup_dir, backup_path)) = backup {
+            if let Err(restore_error) = fs::rename(&backup_path, &dest_dir) {
+                let _ = backup_dir.keep();
+                return Err(PackageError::Io(restore_error));
+            }
+        }
+        return Err(PackageError::Io(error));
+    }
+    let _ = staged_package.keep();
+
+    // Run post_install only after the artifact has its stable final path.
+    // Recipes commonly create prefix symlinks that point into this directory.
+    let mut post_install_ctx = ctx.clone();
+    post_install_ctx.dest_dir = dest_dir.clone();
+    if let Err(error) = loader.run_hooks(&script, &post_install_ctx, &["post_install"]) {
+        let rollback_error = post_install_ctx.rollback_new_writes().err();
+        if let Err(remove_error) = fs::remove_dir_all(&dest_dir) {
+            if let Some((backup_dir, _)) = backup {
+                let _ = backup_dir.keep();
+            }
+            return Err(PackageError::Io(remove_error));
+        }
+        if let Some((backup_dir, backup_path)) = backup {
+            if let Err(restore_error) = fs::rename(&backup_path, &dest_dir) {
+                let _ = backup_dir.keep();
+                return Err(PackageError::Io(restore_error));
+            }
+        }
+        if let Some(rollback_error) = rollback_error {
+            return Err(PackageError::Io(rollback_error));
+        }
+        return Err(error.into());
+    }
+
+    let mut installed_files: HashSet<_> = collect_installed_files(&dest_dir).into_iter().collect();
+    installed_files.extend(ctx.written_paths());
+    installed_files = installed_files
+        .into_iter()
+        .map(|path| {
+            path.strip_prefix(&staged_dir)
+                .map(|relative| dest_dir.join(relative))
+                .unwrap_or(path)
+        })
+        .filter(|path| fs::symlink_metadata(path).is_ok())
+        .collect();
 
     let recorded_dependencies = manifest
         .dependencies
@@ -52,19 +126,37 @@ pub fn install(
             runtime: dep.kind == DependencyKind::Runtime,
         })
         .collect();
-
     let record = InstalledRecord::new(
         manifest.name.clone(),
         manifest.version.clone(),
         manifest.description.clone(),
-        installed_files,
+        installed_files.into_iter().collect(),
         is_explicit,
         Some(script),
         recorded_dependencies,
         manifest.source_repository.clone(),
     );
 
-    db.record_install(record.clone())?;
+    if let Err(error) = db.record_install(record.clone()) {
+        let rollback_error = post_install_ctx.rollback_new_writes().err();
+        if let Err(remove_error) = fs::remove_dir_all(&dest_dir) {
+            if let Some((backup_dir, _)) = backup {
+                let _ = backup_dir.keep();
+            }
+            return Err(PackageError::Io(remove_error));
+        }
+        if let Some((backup_dir, backup_path)) = backup {
+            if let Err(restore_error) = fs::rename(&backup_path, &dest_dir) {
+                let _ = backup_dir.keep();
+                return Err(PackageError::Io(restore_error));
+            }
+        }
+        if let Some(rollback_error) = rollback_error {
+            return Err(PackageError::Io(rollback_error));
+        }
+        return Err(error.into());
+    }
+    drop(backup);
 
     for candidate in &manifest.cleanup {
         if let Some(removed) = try_cleanup(candidate, db, cache_dir, prefix)? {
